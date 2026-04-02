@@ -44,6 +44,16 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Bandeau Partenaires/Labels */}
+      <section className="py-12 bg-slate-50 border-y border-slate-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-8 flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
+          <img src="/logos/label-quali.png" alt="Label Quali Répar" className="h-16 w-auto object-contain" />
+          <img src="/logos/pro-co.jpg" alt="Pro & Co" className="h-12 w-auto object-contain" />
+          <img src="/logos/pro-infor.png" alt="Pro & Infor" className="h-14 w-auto object-contain" />
+          <img src="/logos/save-white-blue.png" alt="Save" className="h-10 w-auto object-contain" />
+        </div>
+      </section>
+
       {/* Features - Les 3 piliers */}
       <section id="services" className="py-24 px-8 max-w-7xl mx-auto">
         <div className="grid md:grid-cols-3 gap-12">
