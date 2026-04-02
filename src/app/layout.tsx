@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { createClient } from "lib/supabase";
+import { createClient } from "@/lib/supabase";
 import SupabaseListener from "@/components/supabase-listener"; // Nous allons créer ce fichier ensuite
 import "./globals.css";
 
