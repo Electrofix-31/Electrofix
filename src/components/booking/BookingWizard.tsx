@@ -198,7 +198,7 @@ export default function BookingWizard() {
           {step === 'type' && (
             <motion.div
               key="type"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 1, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
@@ -246,7 +246,7 @@ export default function BookingWizard() {
           {step === 'service' && (
             <motion.div
               key="service"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 1, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
@@ -278,7 +278,7 @@ export default function BookingWizard() {
           {step === 'slot' && (
             <motion.div
               key="slot"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 1, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
@@ -335,7 +335,7 @@ export default function BookingWizard() {
           {step === 'info' && (
             <motion.div
               key="info"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 1, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-4"
@@ -391,7 +391,7 @@ export default function BookingWizard() {
           {step === 'auth' && (
             <motion.div
               key="auth"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 1, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6 text-center max-w-md mx-auto"
@@ -421,7 +421,7 @@ export default function BookingWizard() {
           {step === 'payment' && (
             <motion.div
               key="payment"
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 1, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="space-y-6"
             >

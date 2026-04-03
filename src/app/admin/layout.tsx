@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { LayoutDashboard, Users, Calendar, Package, Mail, Settings, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import AdminLoginForm from '@/components/admin/AdminLoginForm';
 
 export default async function AdminLayout({
   children,
@@ -13,15 +14,7 @@ export default async function AdminLayout({
 
   // Vérification de sécurité : Est-ce un admin ?
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-800">
-        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-slate-200">
-          <h1 className="text-2xl font-bold text-red-600 mb-2">Accès Refusé</h1>
-          <p>Vous n&apos;êtes pas connecté. Veuillez d&apos;abord vous connecter.</p>
-          <Link href="/book" className="mt-4 inline-block text-primary hover:underline">Aller simuler une connexion via la réservation</Link>
-        </div>
-      </div>
-    );
+    return <AdminLoginForm />;
   }
 
   const { data: profile } = await supabase
