@@ -4,13 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
 // Initialiser Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!,
-{
-  apiVersion: '2023-10-16', // Utilise la version API Stripe que tu préfères
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2026-03-25.dahlia', // Version requise par SDK v21
 });
 
 export async function POST(request: Request) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // 1. Vérifier l'authentification de l'utilisateur (client)
   const { data: { user } } = await supabase.auth.getUser();
@@ -150,7 +149,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create payment intent' }, { status: 500 });
   }
 
-  // 7. Créer l'entrée 'appointment' dans Supabase
+  // 7. Extraire le code postal (logique simple pour la France: 5 chiffres consécutifs)
+  let postalCode = null;
+  if (client_address) {
+    const match = client_address.match(/\b\d{5}\b/);
+    if (match) {
+      postalCode = match[0];
+    }
+  }
+
+  // 8. Créer l'entrée 'appointment' dans Supabase
   const { data: appointment, error: createAppointmentError } = await supabase
     .from('appointments')
     .insert({
@@ -163,9 +171,10 @@ export async function POST(request: Request) {
       material_issue: material_issue,
       purchase_info: purchase_info,
       attachment_url: attachment_url,
+      client_postal_code: postalCode, // <- Nouvelle colonne
       stripe_payment_intent_id: paymentIntent.id,
-      payment_status: 'pending', // Sera mis à jour par le webhook Stripe
-      status: 'pending', // Sera mis à jour par le webhook Stripe après paiement réussi
+      payment_status: 'pending', 
+      status: 'pending', 
     })
     .select()
     .single();

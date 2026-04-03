@@ -1,4 +1,5 @@
 import { Wrench, Laptop, Smartphone, ShoppingCart, Calendar, MapPin } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -12,9 +13,9 @@ export default function Home() {
         <div className="flex gap-6 items-center">
           <a href="#services" className="hover:text-accent transition-colors">Services</a>
           <a href="#boutique" className="hover:text-accent transition-colors">Boutique</a>
-          <button className="bg-accent hover:bg-orange-600 text-white px-6 py-2 rounded-full font-semibold transition-all">
+          <Link href="/book" className="bg-accent hover:bg-orange-600 text-white px-6 py-2 rounded-full font-semibold transition-all">
             Prendre RDV
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -28,10 +29,10 @@ export default function Home() {
             Experts en dépannage électroménager, informatique et téléphonie à domicile ou en atelier.
           </p>
           <div className="flex flex-wrap gap-4">
-            <button className="bg-white text-primary px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all flex items-center gap-2">
+            <Link href="/book" className="bg-white text-primary px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all flex items-center gap-2">
               <Calendar className="w-5 h-5" />
               Réserver une réparation
-            </button>
+            </Link>
             <button className="bg-transparent border-2 border-white/30 hover:border-white text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-2">
               <ShoppingCart className="w-5 h-5" />
               Visiter la boutique
