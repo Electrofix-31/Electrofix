@@ -13,7 +13,15 @@ export default async function AdminLayout({
 
   // Vérification de sécurité : Est-ce un admin ?
   if (!user) {
-    redirect('/');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-800">
+        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-slate-200">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">Accès Refusé</h1>
+          <p>Vous n&apos;êtes pas connecté. Veuillez d&apos;abord vous connecter.</p>
+          <Link href="/book" className="mt-4 inline-block text-primary hover:underline">Aller simuler une connexion via la réservation</Link>
+        </div>
+      </div>
+    );
   }
 
   const { data: profile } = await supabase
@@ -23,7 +31,16 @@ export default async function AdminLayout({
     .single();
 
   if (profile?.role !== 'admin') {
-    redirect('/');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-800">
+        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-slate-200">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">Accès Refusé</h1>
+          <p>Vous êtes connecté avec l&apos;email : <strong>{user.email}</strong></p>
+          <p className="mt-2 text-slate-600">Mais votre rôle actuel est : <strong>{profile?.role || 'aucun/client'}</strong>.</p>
+          <p className="mt-2">Seuls les administrateurs ont accès à cet espace.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
