@@ -1,4 +1,4 @@
-import { Wrench, Laptop, Smartphone, ShoppingCart, Calendar, MapPin } from "lucide-react";
+import { Wrench, Laptop, Smartphone, ShoppingCart, Calendar, MapPin, User } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
@@ -13,6 +13,10 @@ export default function Home() {
         <div className="flex gap-6 items-center">
           <a href="#services" className="hover:text-accent transition-colors">Services</a>
           <a href="#boutique" className="hover:text-accent transition-colors">Boutique</a>
+          <Link href="/login" className="flex items-center gap-2 hover:text-accent transition-colors font-semibold">
+            <User className="w-5 h-5" />
+            Mon compte
+          </Link>
           <Link href="/book" className="bg-accent hover:bg-orange-600 text-white px-6 py-2 rounded-full font-semibold transition-all">
             Prendre RDV
           </Link>

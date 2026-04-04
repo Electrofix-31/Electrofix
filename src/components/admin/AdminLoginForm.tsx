@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, Loader2, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminLoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -98,10 +99,10 @@ export default function AdminLoginForm() {
                   if (!email) alert("Veuillez d'abord saisir votre adresse email.");
                   else {
                     supabase.auth.resetPasswordForEmail(email, {
-                      redirectTo: `${window.location.origin}/auth/reset-password`,
+                      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
                     }).then(({ error }) => {
                       if (error) alert(error.message);
-                      else alert("Un email de réinitialisation a été envoyé.");
+                      else alert("Un email de réinitialisation a été envoyé. Vérifiez votre boîte de réception.");
                     });
                   }
                 }}
@@ -115,13 +116,20 @@ export default function AdminLoginForm() {
                 <Lock className="h-5 w-5 text-slate-400" />
               </div>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none"
+                className="w-full pl-11 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
 
