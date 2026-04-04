@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
+import { geocodeAddress } from '@/lib/geo';
 
 // Initialiser Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -52,6 +53,17 @@ export async function POST(request: Request) {
 {
     console.error('Error updating client profile:', profileUpdateError);
     // Continuer sans erreur bloquante si la mise à jour du profil n'est pas critique pour la réservation
+  }
+
+  // 2.5 Géocodage de l'adresse (seulement si domicile)
+  let latitude = null;
+  let longitude = null;
+  if (appointment_type === 'domicile' && client_address) {
+    const coords = await geocodeAddress(client_address);
+    if (coords) {
+      latitude = coords.lat;
+      longitude = coords.lon;
+    }
   }
 
   // 3. Vérifier la disponibilité des créneaux (logique simplifiée pour l'instant)
@@ -171,7 +183,11 @@ export async function POST(request: Request) {
       material_issue: material_issue,
       purchase_info: purchase_info,
       attachment_url: attachment_url,
-      client_postal_code: postalCode, // <- Nouvelle colonne
+      client_postal_code: postalCode,
+      client_address: client_address,
+      client_phone: client_phone,
+      latitude: latitude,
+      longitude: longitude,
       stripe_payment_intent_id: paymentIntent.id,
       payment_status: 'pending', 
       status: 'pending', 
