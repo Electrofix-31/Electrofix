@@ -29,7 +29,23 @@ export default async function proxy(request: NextRequest) {
     }
   )
 
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Check if user is blocked
+  if (user && !request.nextUrl.pathname.startsWith('/blocked')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_blocked')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.is_blocked) {
+      // Redirect to a special blocked page or sign out
+      const url = request.nextUrl.clone()
+      url.pathname = '/blocked'
+      return NextResponse.redirect(url)
+    }
+  }
 
   return response
 }

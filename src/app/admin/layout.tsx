@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { LayoutDashboard, Users, Calendar, Package, Mail, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Package, Mail, Settings, LogOut, Shield } from 'lucide-react';
 import Link from 'next/link';
 import AdminLoginForm from '@/components/admin/AdminLoginForm';
 
@@ -75,6 +75,9 @@ export default async function AdminLayout({
           </Link>
           <Link href="/admin/appointments" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
             <Calendar className="w-5 h-5" /> Rendez-vous
+          </Link>
+          <Link href="/admin/users" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
+            <Shield className="w-5 h-5" /> Utilisateurs
           </Link>
           <Link href="/admin/technicians" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
             <Users className="w-5 h-5" /> Techniciens

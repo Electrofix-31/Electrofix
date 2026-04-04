@@ -90,7 +90,26 @@ export default function AdminLoginForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Mot de passe</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-bold text-slate-700">Mot de passe</label>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (!email) alert("Veuillez d'abord saisir votre adresse email.");
+                  else {
+                    supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/auth/reset-password`,
+                    }).then(({ error }) => {
+                      if (error) alert(error.message);
+                      else alert("Un email de réinitialisation a été envoyé.");
+                    });
+                  }
+                }}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-slate-400" />
