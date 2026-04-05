@@ -32,11 +32,12 @@ export async function POST(request: Request) {
     }
 
     // 1. Générer le lien de récupération via Supabase
+    // On redirige vers le callback pour établir la session, puis vers la page de reset
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: `${origin}/auth/reset-password`,
+        redirectTo: `${origin}/auth/callback?next=/auth/reset-password`,
       }
     });
 
