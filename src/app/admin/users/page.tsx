@@ -50,13 +50,16 @@ export default function UserManagementPage() {
 
   const sendResetEmail = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
-      if (error) throw error;
-      alert(`Un email de réinitialisation a été envoyé à ${email}`);
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      alert(`Un email de réinitialisation via Resend a été envoyé à ${email}`);
+    } catch (error: any) {
+      alert(`Erreur : ${error.message}`);
     }
   };
 

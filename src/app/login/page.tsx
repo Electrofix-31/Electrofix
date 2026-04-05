@@ -78,11 +78,14 @@ export default function LoginPage() {
     
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
-      if (error) throw error;
-      setMessage({ type: 'success', text: 'Un lien de réinitialisation a été envoyé à votre adresse email.' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMessage({ type: 'success', text: 'Un lien de réinitialisation a été envoyé via Resend.' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message });
     } finally {

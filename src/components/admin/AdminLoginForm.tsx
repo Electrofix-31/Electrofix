@@ -95,15 +95,24 @@ export default function AdminLoginForm() {
               <label className="block text-sm font-bold text-slate-700">Mot de passe</label>
               <button 
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (!email) alert("Veuillez d'abord saisir votre adresse email.");
                   else {
-                    supabase.auth.resetPasswordForEmail(email, {
-                      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
-                    }).then(({ error }) => {
-                      if (error) alert(error.message);
-                      else alert("Un email de réinitialisation a été envoyé. Vérifiez votre boîte de réception.");
-                    });
+                    setLoading(true);
+                    try {
+                      const res = await fetch('/api/auth/reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email }),
+                      });
+                      const data = await res.json();
+                      if (data.error) throw new Error(data.error);
+                      alert("Un email de réinitialisation a été envoyé via Resend. Vérifiez votre boîte de réception.");
+                    } catch (err: any) {
+                      alert(err.message || "Erreur lors de l'envoi de l'email.");
+                    } finally {
+                      setLoading(false);
+                    }
                   }
                 }}
                 className="text-xs font-bold text-primary hover:underline"
