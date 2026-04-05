@@ -28,9 +28,11 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      
       if (mode === 'password') {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password,
         });
 

@@ -21,8 +21,10 @@ export default function AdminLoginForm() {
     setError(null);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
