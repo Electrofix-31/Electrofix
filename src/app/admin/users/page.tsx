@@ -55,8 +55,17 @@ export default function UserManagementPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error("Clés d'API manquantes côté serveur.");
+      }
+
+      if (!res.ok || data?.error) throw new Error(data?.error || "Erreur serveur inattendue");
+      
       alert(`Un email de réinitialisation via Resend a été envoyé à ${email}`);
     } catch (error: any) {
       alert(`Erreur : ${error.message}`);

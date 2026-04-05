@@ -83,8 +83,17 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error("Erreur critique du serveur (Les variables d'environnement sont probablement manquantes).");
+      }
+
+      if (!res.ok || data.error) throw new Error(data.error || "Erreur serveur inattendue.");
+
       setMessage({ type: 'success', text: 'Un lien de réinitialisation a été envoyé via Resend.' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message });

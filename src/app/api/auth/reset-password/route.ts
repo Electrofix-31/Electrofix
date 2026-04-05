@@ -2,12 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resend } from '@/lib/resend';
 
-// On utilise le Service Role Key pour pouvoir générer des liens d'admin
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(request: Request) {
   try {
     const { email } = await request.json();
@@ -15,6 +9,17 @@ export async function POST(request: Request) {
     if (!email) {
       return NextResponse.json({ error: 'Email requis' }, { status: 400 });
     }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Variables d environnement Supabase manquantes.');
+      return NextResponse.json({ error: 'Configuration serveur incomplète (clés Supabase manquantes).' }, { status: 500 });
+    }
+
+    // On initialise le client dans la fonction pour éviter de crasher toute la route si les clés manquent
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // 1. Générer le lien de récupération via Supabase
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -32,6 +37,11 @@ export async function POST(request: Request) {
     }
 
     const resetLink = data.properties.action_link;
+    
+    if (!process.env.RESEND_API_KEY) {
+      console.error('Variable RESEND_API_KEY manquante.');
+      return NextResponse.json({ error: 'Configuration serveur incomplète (clé Email manquante).' }, { status: 500 });
+    }
 
     // 2. Envoyer l'email via Resend
     const { error: sendError } = await resend.emails.send({
@@ -61,7 +71,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: 'Email envoyé avec succès.' });
   } catch (error: any) {
-    console.error('Erreur Reset Password Route:', error);
-    return NextResponse.json({ error: 'Erreur serveur.' }, { status: 500 });
+    console.error('Erreur globale Reset Password Route:', error);
+    return NextResponse.json({ error: 'Erreur serveur interne.' }, { status: 500 });
   }
 }

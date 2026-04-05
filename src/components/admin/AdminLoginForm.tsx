@@ -105,8 +105,17 @@ export default function AdminLoginForm() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email }),
                       });
-                      const data = await res.json();
-                      if (data.error) throw new Error(data.error);
+                      
+                      const text = await res.text();
+                      let data;
+                      try {
+                        data = JSON.parse(text);
+                      } catch (e) {
+                        throw new Error("Erreur critique du serveur. Les clés d'API (Resend ou Supabase) sont manquantes.");
+                      }
+
+                      if (!res.ok || data.error) throw new Error(data.error || "Erreur serveur.");
+                      
                       alert("Un email de réinitialisation a été envoyé via Resend. Vérifiez votre boîte de réception.");
                     } catch (err: any) {
                       alert(err.message || "Erreur lors de l'envoi de l'email.");
