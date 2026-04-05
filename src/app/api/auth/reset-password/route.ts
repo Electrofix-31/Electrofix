@@ -21,12 +21,22 @@ export async function POST(request: Request) {
     // On initialise le client dans la fonction pour éviter de crasher toute la route si les clés manquent
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Détermination de l'origine pour le lien de redirection
+    let origin = process.env.NEXT_PUBLIC_SITE_URL;
+    
+    if (!origin) {
+      // Fallback sur les headers si la variable est absente
+      const host = request.headers.get('host');
+      const protocol = request.headers.get('x-forwarded-proto') || 'http';
+      origin = `${protocol}://${host}`;
+    }
+
     // 1. Générer le lien de récupération via Supabase
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: `${new URL(request.url).origin}/auth/reset-password`,
+        redirectTo: `${origin}/auth/reset-password`,
       }
     });
 
