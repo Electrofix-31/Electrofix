@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resend } from '@/lib/resend';
 
+// Forcer la route à être dynamique pour éviter tout cache d'URL (localhost) lors du build
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const { email } = await request.json();
@@ -14,25 +17,29 @@ export async function POST(request: Request) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Variables d environnement Supabase manquantes.');
-      return NextResponse.json({ error: 'Configuration serveur incomplète (clés Supabase manquantes).' }, { status: 500 });
+      return NextResponse.json({ error: 'Configuration serveur incomplète (clés Supabase).' }, { status: 500 });
     }
 
-    // On initialise le client dans la fonction pour éviter de crasher toute la route si les clés manquent
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Détermination de l'origine pour le lien de redirection
-    let origin = process.env.NEXT_PUBLIC_SITE_URL;
+    // Détermination de l'origine de manière ultra-fiable
+    // 1. Priorité à la variable d'environnement (si elle est définie)
+    // 2. Sinon, on utilise les headers de la requête
+    let origin = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
     
     if (!origin) {
-      // Fallback sur les headers si la variable est absente
       const host = request.headers.get('host');
-      const protocol = request.headers.get('x-forwarded-proto') || 'http';
+      const protocol = request.headers.get('x-forwarded-proto') || 'https'; // On force https sur une VM
       origin = `${protocol}://${host}`;
     }
 
+    // Nettoyage de l'origin (enlever le slash final s'il existe pour éviter les doubles slashes)
+    origin = origin.replace(/\/$/, '');
+
+    console.log('Utilisation de l\'origine pour le reset:', origin);
+
     // 1. Générer le lien de récupération via Supabase
-    // On redirige vers le callback pour établir la session, puis vers la page de reset
+    // On passe par le callback pour créer la session
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
@@ -43,15 +50,13 @@ export async function POST(request: Request) {
 
     if (linkError) {
       console.error('Erreur Supabase Link:', linkError);
-      // Pour des raisons de sécurité, on ne dit pas si l'email existe ou pas
       return NextResponse.json({ message: 'Si cet email existe, un message a été envoyé.' });
     }
 
     const resetLink = data.properties.action_link;
     
     if (!process.env.RESEND_API_KEY) {
-      console.error('Variable RESEND_API_KEY manquante.');
-      return NextResponse.json({ error: 'Configuration serveur incomplète (clé Email manquante).' }, { status: 500 });
+      return NextResponse.json({ error: 'Configuration serveur incomplète (Resend).' }, { status: 500 });
     }
 
     // 2. Envoyer l'email via Resend
@@ -76,7 +81,6 @@ export async function POST(request: Request) {
     });
 
     if (sendError) {
-      console.error('Erreur Resend:', sendError);
       return NextResponse.json({ error: "Erreur lors de l'envoi de l'email." }, { status: 500 });
     }
 
