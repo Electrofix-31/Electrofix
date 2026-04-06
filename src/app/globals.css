@@ -24,5 +24,12 @@
   body {
     color: var(--foreground);
     background: var(--background);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Empêche les navigateurs mobiles de modifier la taille du texte après rotation */
+    -webkit-text-size-adjust: 100%;
+    /* Évite les reflets bleus au clic sur mobile/tablette */
+    -webkit-tap-highlight-color: transparent;
   }
 }
