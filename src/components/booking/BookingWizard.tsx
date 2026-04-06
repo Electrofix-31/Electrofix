@@ -614,16 +614,16 @@ export default function BookingWizard() {
               animate={{ opacity: 1, scale: 1 }}
               className="space-y-6"
             >
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-6">
-                <h3 className="font-bold text-slate-800 mb-2">Récapitulatif</h3>
-                <div className="flex justify-between text-slate-600 mb-1">
-                  <span>{selectedService.name}</span>
-                  <span className="font-bold">{selectedService.price}€</span>
+              <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-primary italic text-sm">Finalisation sécurisée</h4>
+                  <p className="text-xs text-primary/60">Référence : {selectedService.name}</p>
                 </div>
-                <div className="text-sm text-slate-500">
-                  Le {selectedDate} à {selectedSlot.start_time.slice(0, 5)}
+                <div className="text-2xl font-black text-primary">
+                  {selectedService?.price}€
                 </div>
               </div>
+              
               <StripeWrapper clientSecret={clientSecret!}>
                 <PaymentForm clientSecret={clientSecret!} appointmentId={appointmentId!} />
               </StripeWrapper>
@@ -640,7 +640,7 @@ export default function BookingWizard() {
 
       {/* Footer Actions */}
       <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-        {step !== 'type' && step !== 'payment' ? (
+        {step !== 'type' && step !== 'payment' && step !== 'auth' ? (
           <button
             onClick={handleBack}
             className="flex items-center gap-2 text-slate-500 font-bold hover:text-slate-800 transition-colors"
@@ -651,7 +651,7 @@ export default function BookingWizard() {
           <div></div>
         )}
 
-        {step !== 'payment' && (
+        {step !== 'payment' && step !== 'auth' && (
           <button
             onClick={handleNext}
             disabled={
@@ -660,8 +660,7 @@ export default function BookingWizard() {
               (step === 'postal' && postalCode.length < 5) ||
               (step === 'service' && !selectedService) ||
               (step === 'slot' && (!selectedSlot || !selectedDate)) ||
-              (step === 'info' && (!clientInfo.email || !clientInfo.name)) ||
-              (step === 'auth' && !magicLinkSent)
+              (step === 'info' && (!clientInfo.email || !clientInfo.name))
             }
             className="bg-primary text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
           >

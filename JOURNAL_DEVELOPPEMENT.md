@@ -122,8 +122,45 @@ Une interface "intelligente" qui se met à jour toute seule, garantissant une co
 
 ---
 
-## [06/04/2026] - Stabilisation du Moteur de Planning et Vision "No-Code"
+## [06/04/2026] - Standardisation ES Modules (ESM)
 
+### Problématique
+Node.js affichait des avertissements de performance et de compatibilité au démarrage, car le projet utilisait des fichiers modernes sans que le `package.json` ne précise le type "module".
+
+### Analyse & Logique
+*   Les outils modernes (Next.js 16, Tailwind 4) préfèrent le standard ESM.
+*   Il est préférable d'être explicite pour éviter que Node.js ne doive "deviner" le format des fichiers de configuration.
+
+### Décision / Solution
+1.  **package.json** : Ajout de `"type": "module"`.
+2.  **postcss.config.js** : Conversion vers la syntaxe `export default`.
+
+### Résultat
+Une console de démarrage propre, sans avertissements, et un projet aligné sur les derniers standards de l'écosystème JavaScript.
+
+---
+
+## [06/04/2026] - Sécurité Bancaire et Recette Stripe
+
+### Problématique
+Lors des tests multi-comptes, la même carte bancaire apparaissait suggérée dans le formulaire Stripe, soulevant une question sur la séparation des données clients.
+
+### Analyse & Logique
+*   **Stripe Link** : Une fonctionnalité native de Stripe mémorise les moyens de paiement pour un email donné pour faciliter l'achat (validation par SMS).
+*   **Isolation** : L'application ELECTRO'FIX ne stocke AUCUNE donnée bancaire. Le formulaire est une "fenêtre sécurisée" (iframe) gérée exclusivement par Stripe.
+*   **Auto-fill** : Le navigateur local peut également suggérer des numéros de carte de test enregistrés.
+
+### Décision / Solution
+1.  **Mémo Recette Finale** : Effectuer un test de "bout en bout" sur un ordinateur tiers en navigation privée lors de la remise des clés pour prouver l'étanchéité des comptes clients à la gérante.
+2.  **Configuration Stripe** : Garder "Stripe Link" actif pour l'instant (avantage utilisateur) mais se tenir prêt à le désactiver si la gérante préfère un formulaire vierge systématique.
+
+### Résultat
+Une compréhension claire de la séparation des responsabilités entre l'application et le prestataire de paiement (Stripe), garantissant la conformité RGPD et la sécurité.
+
+---
+
+## [06/04/2026] - Stabilisation du Moteur de Planning et Vision "No-Code"
+...
 ### Problématique
 Le calcul de disponibilité des créneaux était instable en environnement de test à cause de données de base de données incomplètes ou absentes (Techniciens).
 
