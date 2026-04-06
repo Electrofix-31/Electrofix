@@ -62,36 +62,39 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      {/* Barre latérale (Sidebar) */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col sticky top-0 h-screen">
-        <div className="p-6 text-2xl font-bold border-b border-slate-800 flex items-center gap-2">
-          <span className="text-accent">ADMIN</span>
-          <span>FIX</span>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-100">
+      {/* Barre de navigation (Sidebar sur Desktop / Header sur Mobile) */}
+      <aside className="w-full lg:w-64 bg-slate-900 text-white flex flex-col lg:sticky lg:top-0 lg:h-screen shadow-xl z-50">
+        <div className="p-4 lg:p-6 text-xl lg:text-2xl font-bold border-b border-slate-800 flex items-center justify-between lg:justify-start gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-accent">ADMIN</span>
+            <span>FIX</span>
+          </div>
+          {/* Optionnel: Bouton Menu pour mobile ici plus tard */}
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          <Link href="/admin" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors bg-slate-800 text-accent font-semibold">
-            <LayoutDashboard className="w-5 h-5" /> Dashboard
+        <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible p-2 lg:p-4 gap-1 lg:gap-2 no-scrollbar">
+          <Link href="/admin" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors bg-slate-800 text-accent font-semibold whitespace-nowrap">
+            <LayoutDashboard className="w-5 h-5" /> <span className="text-sm lg:text-base">Dashboard</span>
           </Link>
-          <Link href="/admin/appointments" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
-            <Calendar className="w-5 h-5" /> Rendez-vous
+          <Link href="/admin/appointments" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
+            <Calendar className="w-5 h-5" /> <span className="text-sm lg:text-base">Rendez-vous</span>
           </Link>
-          <Link href="/admin/users" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
-            <Shield className="w-5 h-5" /> Utilisateurs
+          <Link href="/admin/users" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
+            <Shield className="w-5 h-5" /> <span className="text-sm lg:text-base">Utilisateurs</span>
           </Link>
-          <Link href="/admin/technicians" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
-            <Users className="w-5 h-5" /> Techniciens
+          <Link href="/admin/technicians" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
+            <Users className="w-5 h-5" /> <span className="text-sm lg:text-base">Techniciens</span>
           </Link>
-          <Link href="/admin/inventory" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
-            <Package className="w-5 h-5" /> Stock & Boutique
+          <Link href="/admin/inventory" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
+            <Package className="w-5 h-5" /> <span className="text-sm lg:text-base">Stock</span>
           </Link>
-          <Link href="/admin/emails" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
-            <Mail className="w-5 h-5" /> Emails (IA)
+          <Link href="/admin/emails" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
+            <Mail className="w-5 h-5" /> <span className="text-sm lg:text-base">Emails</span>
           </Link>
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-2">
+        <div className="hidden lg:flex flex-col p-4 border-t border-slate-800 gap-2 mt-auto">
           <Link href="/admin/settings" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
             <Settings className="w-5 h-5" /> Paramètres
           </Link>
@@ -100,7 +103,7 @@ export default async function AdminLayout({
       </aside>
 
       {/* Zone de contenu principale */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto w-full">
         {children}
       </main>
     </div>
