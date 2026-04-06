@@ -144,6 +144,24 @@ export default function BookingWizard() {
 
   // Suppression de verifyOtpAndBook car on utilise maintenant un lien direct
 
+  // Écouteur en temps réel pour l'authentification (pour mettre à jour la fenêtre automatiquement)
+  useEffect(() => {
+    if (!mounted) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Si l'utilisateur se connecte (via un autre onglet), on le passe au récapitulatif
+        if (step === 'auth') {
+          setStep('review');
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [mounted, step]);
+
   // Auto-step from URL (Magic Link Redirect)
   useEffect(() => {
     if (!mounted) return;

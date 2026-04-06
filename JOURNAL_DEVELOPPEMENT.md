@@ -104,6 +104,24 @@ Un parcours client professionnel, rassurant et conforme aux standards du e-comme
 
 ---
 
+## [06/04/2026] - Synchronisation en Temps Réel du Parcours Client
+
+### Problématique
+Lors de l'étape de validation par email (Magic Link), l'onglet original du navigateur restait bloqué sur le message d'attente, même après que l'utilisateur ait cliqué sur le lien dans une autre fenêtre.
+
+### Analyse & Logique
+*   L'authentification via Magic Link crée une rupture de navigation (l'utilisateur quitte le site pour aller dans ses mails).
+*   Pour une expérience fluide, l'onglet "source" doit être capable d'écouter les changements d'état du serveur sans intervention manuelle (rafraîchissement).
+
+### Décision / Solution
+1.  **Auth Listener (onAuthStateChange)** : Utilisation de l'écouteur d'événements de Supabase dans le composant `BookingWizard`.
+2.  **Transition Automatique** : Dès que l'événement `SIGNED_IN` est détecté, l'assistant bascule instantanément l'utilisateur vers l'étape suivante (Récapitulatif).
+
+### Résultat
+Une interface "intelligente" qui se met à jour toute seule, garantissant une continuité parfaite du tunnel de vente malgré le passage par la boîte mail.
+
+---
+
 ## [06/04/2026] - Stabilisation du Moteur de Planning et Vision "No-Code"
 
 ### Problématique
