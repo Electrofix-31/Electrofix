@@ -13,8 +13,8 @@ function SuccessContent() {
 
   useEffect(() => {
     if (appointmentId) {
-      // On pourrait appeler une API pour récupérer les détails du RDV
-      // Pour l'instant on simule ou on laisse un message générique pro
+      // Vider la mémoire de réservation après un succès
+      localStorage.removeItem('pending_booking');
       setLoading(false);
     }
   }, [appointmentId]);

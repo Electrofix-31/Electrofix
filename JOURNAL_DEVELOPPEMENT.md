@@ -121,3 +121,39 @@ Comment adapter automatiquement le planning à l'équipe réelle de la gérante 
 ### Résultat
 Une solution flexible qui "respire" avec l'activité réelle de l'entreprise et offre une autonomie totale à la gérante.
 
+---
+
+## [06/04/2026] - Fiabilisation des Emails via Centralisation Resend
+
+### Problématique
+Les emails envoyés via le service interne de Supabase (Lien Magique) n'arrivaient pas ou étaient bloqués (limites d'envoi et configuration de domaine). Le domaine personnalisé `badie.ovh` n'était pas utilisé pour ces envois.
+
+### Analyse & Logique
+*   Supabase limite les envois gratuits et n'utilise pas par défaut le domaine configuré dans Resend.
+*   Centraliser tous les flux d'emails (Auth, Reset, Notifs) sur **Resend** permet de profiter de la validation DNS du domaine `badie.ovh` effectuée sur Cloudflare.
+
+### Décision / Solution
+1.  **API Custom Magic Link** : Création d'une route `/api/auth/magic-link` qui génère le jeton via Supabase Admin mais délègue l'envoi à Resend.
+2.  **Harmonisation de l'Expéditeur** : Tous les emails partent désormais de `ElectroFix <noreply@electrofix.badie.ovh>`.
+
+### Résultat
+Réception instantanée et fiable des liens de connexion, renforçant la confiance de l'utilisateur final et la délivrabilité.
+
+---
+
+## [06/04/2026] - Persistance et Nettoyage des Données de Réservation
+
+### Problématique
+L'utilisation du `localStorage` pour sauvegarder le formulaire (mémoire de session) entraînait la réapparition des données d'un ancien client lors d'une nouvelle réservation.
+
+### Analyse & Logique
+*   La mémoire locale est indispensable pour ne pas perdre la saisie après le clic sur l'email de validation.
+*   Cependant, cette mémoire doit avoir un cycle de vie : elle doit naître au début du formulaire et mourir dès que le paiement est validé.
+
+### Décision / Solution
+1.  **Destruction Post-Paiement** : Ajout d'une commande `localStorage.removeItem` sur la page `/book/success`.
+2.  **Initialisation Propre** : L'assistant de réservation détecte s'il s'agit d'une nouvelle session ou d'un retour de mail pour décider s'il doit pré-remplir les champs.
+
+### Résultat
+Une expérience utilisateur fluide qui "mémorise" ce qui est nécessaire mais garantit une page blanche pour chaque nouvelle commande.
+

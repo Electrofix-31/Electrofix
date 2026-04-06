@@ -10,6 +10,7 @@ import PaymentForm from './PaymentForm';
 type Step = 'type' | 'postal' | 'service' | 'slot' | 'info' | 'auth' | 'review' | 'payment';
 
 export default function BookingWizard() {
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<Step>('type');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +42,11 @@ export default function BookingWizard() {
   const [slots, setSlots] = useState<any[]>([]);
 
   const supabase = createClient();
+
+  // Fix Hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Load services when appointment type changes
   useEffect(() => {
@@ -110,21 +116,22 @@ export default function BookingWizard() {
           await supabase.auth.signOut();
         }
 
-        // On envoie le lien magique (Magic Link)
+        // On envoie le lien magique via notre API Resend
         if (!cleanEmail) throw new Error("Veuillez renseigner un email valide.");
         
-        const { error: magicError } = await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: `${window.location.origin}/book?step=review`,
-            data: {
-              full_name: clientInfo.name,
-              phone: clientInfo.phone,
-            }
-          }
+        const res = await fetch('/api/auth/magic-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            email: cleanEmail,
+            name: clientInfo.name,
+            phone: clientInfo.phone
+          }),
         });
-        
-        if (magicError) throw magicError;
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erreur lors de l'envoi du lien.");
+
         setMagicLinkSent(true);
         setStep('auth');
       }
@@ -139,11 +146,12 @@ export default function BookingWizard() {
 
   // Auto-step from URL (Magic Link Redirect)
   useEffect(() => {
+    if (!mounted) return;
     const params = new URLSearchParams(window.location.search);
     const urlStep = params.get('step');
     
-    // Récupérer les données stockées
-    const savedData = sessionStorage.getItem('pending_booking');
+    // Récupérer les données stockées (localStorage est plus tenace que sessionStorage)
+    const savedData = localStorage.getItem('pending_booking');
     
     if (savedData) {
       const parsed = JSON.parse(savedData);
@@ -160,12 +168,13 @@ export default function BookingWizard() {
         window.history.replaceState({}, '', window.location.pathname);
       }
     }
-  }, []);
+  }, [mounted]);
 
   // Sauvegarde automatique à chaque changement d'étape pour ne rien perdre
   useEffect(() => {
-    if (step !== 'type') {
-      sessionStorage.setItem('pending_booking', JSON.stringify({
+    if (!mounted) return;
+    if (step !== 'type' && step !== 'payment') {
+      localStorage.setItem('pending_booking', JSON.stringify({
         type: appointmentType,
         postalCode,
         service: selectedService,
@@ -174,7 +183,9 @@ export default function BookingWizard() {
         info: clientInfo
       }));
     }
-  }, [step, appointmentType, postalCode, selectedService, selectedDate, selectedSlot, clientInfo]);
+  }, [step, appointmentType, postalCode, selectedService, selectedDate, selectedSlot, clientInfo, mounted]);
+
+  if (!mounted) return <div className="p-12 text-center text-slate-400">Chargement de l&apos;assistant...</div>;
 
   const createAppointment = async () => {
     setLoading(true);
