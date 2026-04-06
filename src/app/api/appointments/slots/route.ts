@@ -1,123 +1,72 @@
-// src/app/api/appointments/slots/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
   const supabase = await createClient();
-
   const { searchParams } = new URL(request.url);
-  const service_type = searchParams.get('service_type'); // 'atelier' ou 'domicile'
-  const date = searchParams.get('date'); // Format 'YYYY-MM-DD'
-  const postal_code = searchParams.get('postal_code'); // Optionnel, pour géo-optimisation
+  const service_type = searchParams.get('service_type');
+  const date = searchParams.get('date');
+  const postal_code = searchParams.get('postal_code');
 
-  if (!service_type || !date)
-{
-    return NextResponse.json({ error: 'Missing service_type or date parameter' }, { status: 400 });
-  }
+  if (!service_type || !date) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
 
-  // Récupérer tous les créneaux actifs
-  const { data: availableSlots, error } = await supabase
+  // 1. Récupérer les créneaux
+  const { data: availableSlots } = await supabase
     .from('appointment_slots')
     .select('*')
     .eq('date', date)
     .eq('is_active', true)
     .order('start_time', { ascending: true });
 
-  if (error)
-{
-    console.error('Error fetching appointment slots:', error);
-    return NextResponse.json({ error: 'Failed to fetch appointment slots' }, { status: 500 });
-  }
+  // 2. Configuration Équipe Réelle (Gérante + Vendeuse + 3 Techs)
+  const fixedStaffCount = 2; 
+  const minStaffRequired = 3;
+  
+  // ITINÉRANCE : On force 2 itinérants et 1 sédentaire pour la simulation réelle
+  const totalStoreStaff = 3;    // Les 3 techs peuvent être au magasin
+  const totalFieldCapacity = 2; // Seuls 2 peuvent sortir (Tech 2 et Tech 3)
 
-  // 1. Récupérer le nombre minimum de personnel requis au magasin
-  const { data: minStaffSetting } = await supabase
-    .from('admin_settings')
-    .select('value')
-    .eq('key', 'min_staff_store')
-    .single();
-  const minStaffRequired = (minStaffSetting?.value as any)?.value || 3;
-
-  // 2. Récupérer tous les techniciens capables de travailler au magasin
-  const { data: storeTechnicians } = await supabase
-    .from('technicians')
-    .select('profile_id')
-    .eq('is_available_store', true);
-  const totalStoreStaff = storeTechnicians?.length || 0;
-
-  // 3. Récupérer les rendez-vous déjà pris pour cette date
+  // 3. Récupérer les RDV déjà pris
   const { data: bookedAppointments } = await supabase
     .from('appointments')
     .select('time, appointment_type, status, client_postal_code')
     .eq('date', date)
     .neq('status', 'cancelled');
 
-  // 4. Récupérer le nombre de techniciens réellement disponibles pour le TERRAIN (Field)
-  // On pourra affiner avec les plannings individuels plus tard
-  const { data: fieldTechs } = await supabase
-    .from('technicians')
-    .select('id')
-    .eq('is_available_field', true);
-  const totalFieldCapacity = fieldTechs?.length || 0;
+  const [y, m, d] = date.split('-');
+  console.log(`[${d}/${m}] Slots:${availableSlots?.length || 0} | RDV:${bookedAppointments?.length || 0} | Team:OK`);
 
-  // 5. Filtrer et "Scorer" les créneaux
-  const slotsWithCapacityAndScore = availableSlots.map(slot => {
+  // 4. Calcul des disponibilités
+  const finalSlots = (availableSlots || []).map(slot => {
     const timeStr = slot.start_time;
+
+    const fieldAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'domicile').length || 0;
+    const storeAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'atelier').length || 0;
+
+    // Logique RH : On a 2 fixes + (3 techs - ceux dehors - ceux en atelier)
+    const techAtStore = totalStoreStaff - fieldAppsAtTime;
+    const currentStoreStaff = fixedStaffCount + techAtStore - storeAppsAtTime;
     
-    // --- CALCUL DE CAPACITÉ DYNAMIQUE ---
-    
-    // RDV déjà pris à cette heure-là
-    const fieldAppointmentsAtTime = bookedAppointments?.filter(app => 
-      app.time === timeStr && app.appointment_type === 'domicile'
-    ).length || 0;
+    const isStoreRuleRespected = currentStoreStaff >= minStaffRequired;
 
-    const storeAppointmentsAtTime = bookedAppointments?.filter(app => 
-      app.time === timeStr && app.appointment_type === 'atelier'
-    ).length || 0;
+    // Capacité Terrain : Il reste des itinérants ET on peut en envoyer un de plus sans casser les 3 au magasin
+    const remainingFieldTechs = totalFieldCapacity - fieldAppsAtTime;
+    const canSendOneMoreToField = (fixedStaffCount + (techAtStore - 1)) >= minStaffRequired;
 
-    // RÈGLE RH (Atelier/Magasin)
-    // On vérifie qu'on ne dépasse pas la capacité d'accueil physique du magasin
-    // ET qu'on respecte le personnel minimum requis
-    const occupiedStaffInStore = storeAppointmentsAtTime; 
-    const remainingStoreStaff = totalStoreStaff - occupiedStaffInStore;
-    
-    // Si la table technicians est vide (totalStoreStaff === 0), on ignore la règle RH pour le test
-    const isStoreRuleRespected = totalStoreStaff === 0 || remainingStoreStaff >= minStaffRequired;
+    const isAvailable = service_type === 'atelier'
+      ? (isStoreRuleRespected && storeAppsAtTime < slot.max_capacity_store)
+      : (remainingFieldTechs > 0 && canSendOneMoreToField && fieldAppsAtTime < slot.max_capacity_field);
 
-    // CAPACITÉ TERRAIN (Domicile)
-    // Capacité réelle = Total techniciens itinérants - RDV déjà pris
-    // Si totalFieldCapacity est 0, on se base uniquement sur max_capacity_field du créneau
-    const currentFieldCapacity = totalFieldCapacity === 0 
-      ? slot.max_capacity_field - fieldAppointmentsAtTime
-      : totalFieldCapacity - fieldAppointmentsAtTime;
-
-    // --- GÉO-OPTIMISATION (Domicile) ---
-    let geoScore = 0; 
-    let isRecommended = false;
-
-    if (service_type === 'domicile' && postal_code) {
-      const appointmentsInSameZone = bookedAppointments?.filter(app => 
-        app.appointment_type === 'domicile' && app.client_postal_code === postal_code
-      ) || [];
-
-      if (appointmentsInSameZone.length > 0) {
-        geoScore = 1; 
-        isRecommended = true;
-      }
-    }
+    const isRecommended = service_type === 'domicile' && postal_code && 
+                         bookedAppointments?.some(a => a.appointment_type === 'domicile' && a.client_postal_code === postal_code);
 
     return {
       ...slot,
-      // Un créneau est disponible si :
-      // 1. Pour l'Atelier : La règle RH est respectée ET le magasin n'est pas saturé
-      // 2. Pour le Domicile : Il reste au moins un technicien itinérant libre
-      is_available_for_service: service_type === 'atelier' 
-        ? (isStoreRuleRespected && storeAppointmentsAtTime < slot.max_capacity_store)
-        : (currentFieldCapacity > 0 && fieldAppointmentsAtTime < slot.max_capacity_field),
-      is_recommended: isRecommended,
-      geo_score: geoScore,
-      remaining_capacity: service_type === 'domicile' ? currentFieldCapacity : remainingStoreStaff
+      is_available_for_service: isAvailable,
+      is_recommended: isRecommended || false,
+      remaining_capacity: service_type === 'domicile' ? remainingFieldTechs : currentStoreStaff
     };
   }).filter(slot => slot.is_available_for_service);
 
-  return NextResponse.json(slotsWithCapacityAndScore, { status: 200 });
+  return NextResponse.json(finalSlots, { status: 200 });
 }

@@ -150,10 +150,10 @@ export default function BookingWizard() {
     const params = new URLSearchParams(window.location.search);
     const urlStep = params.get('step');
     
-    // Récupérer les données stockées (localStorage est plus tenace que sessionStorage)
+    // Récupérer les données stockées
     const savedData = localStorage.getItem('pending_booking');
     
-    if (savedData) {
+    if (urlStep === 'review' && savedData) {
       const parsed = JSON.parse(savedData);
       setAppointmentType(parsed.type);
       setPostalCode(parsed.postalCode || '');
@@ -161,14 +161,26 @@ export default function BookingWizard() {
       setSelectedDate(parsed.date);
       setSelectedSlot(parsed.slot);
       setClientInfo(parsed.info);
-      
-      if (urlStep === 'review') {
-        setStep('review');
-        // Nettoyer l'URL sans recharger
-        window.history.replaceState({}, '', window.location.pathname);
-      }
+      setStep('review');
+      // Nettoyer l'URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (!urlStep && step === 'type') {
+      // SI ON EST AU DÉBUT ET PAS DE RETOUR MAIL -> ON EFFACE TOUT
+      localStorage.removeItem('pending_booking');
+      setClientInfo({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        material_ref: '',
+        issue: '',
+      });
+      setPostalCode('');
+      setSelectedService(null);
+      setSelectedDate('');
+      setSelectedSlot(null);
     }
-  }, [mounted]);
+  }, [mounted, step]);
 
   // Sauvegarde automatique à chaque changement d'étape pour ne rien perdre
   useEffect(() => {

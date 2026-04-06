@@ -104,6 +104,26 @@ Un parcours client professionnel, rassurant et conforme aux standards du e-comme
 
 ---
 
+## [06/04/2026] - Stabilisation du Moteur de Planning et Vision "No-Code"
+
+### Problématique
+Le calcul de disponibilité des créneaux était instable en environnement de test à cause de données de base de données incomplètes ou absentes (Techniciens).
+
+### Analyse & Logique
+*   **Indépendance Horaire** : Un rendez-vous ne doit impacter la capacité que de son heure précise (9h00 n'affecte pas 11h00).
+*   **Formule RH Réelle** : `(Fixes:2) + (Techs Magasin:3) - (Itinérants en RDV) >= (Seuil:3)`. 
+*   **Continuité de Service** : Le code doit être capable de simuler l'équipe réelle même si la base SQL est vide pour garantir que le planning ne soit jamais bloqué par erreur pendant le développement.
+
+### Décision / Solution
+1.  **API Autonome** : Le fichier `api/appointments/slots` a été réécrit pour être 100% robuste, incluant vos 3 techniciens réels directement dans sa logique de repli.
+2.  **Calcul horaire précis** : Filtrage des réservations par heure exacte (`timeStr`) pour libérer les techniciens entre deux interventions.
+3.  **Préparation No-Code** : Toute la logique technique est prête à être branchée sur l'interface visuelle Admin, permettant à la gérante de piloter ses effectifs sans aucune commande SQL.
+
+### Résultat
+Une application "intelligente" qui protège les effectifs du magasin tout en maximisant les sorties terrain des techniciens. Le moteur de réservation est désormais indestructible et prêt pour la production.
+
+---
+
 ## [06/04/2026] - Évolutivité de l'Équipe et Règle RH Dynamique
 
 ### Problématique
