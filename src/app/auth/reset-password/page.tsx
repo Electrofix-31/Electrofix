@@ -19,16 +19,26 @@ function ResetPasswordForm() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    let isMounted = true;
+
     const verifyToken = async () => {
       const tokenHash = searchParams.get('token_hash');
       
-      if (!tokenHash) {
+      // Sécurité si le token est manquant ou est littéralement la chaîne "null"
+      if (!tokenHash || tokenHash === 'null') {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setError("Lien de sécurité manquant. Veuillez refaire une demande.");
+        if (!session && isMounted) {
+          setError("Lien de sécurité manquant ou invalide. Veuillez refaire une demande.");
         }
-        setVerifying(false);
+        if (isMounted) setVerifying(false);
         return;
+      }
+
+      // Protection anti-double exécution : on vérifie si on n'a pas DÉJÀ une session active
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        if (isMounted) setVerifying(false);
+        return; // Session déjà établie, on arrête là
       }
 
       try {
@@ -39,13 +49,17 @@ function ResetPasswordForm() {
 
         if (verifyError) throw verifyError;
       } catch (err: any) {
-        setError("Votre lien de sécurité a expiré ou est déjà utilisé.");
+        if (isMounted) setError("Votre lien de sécurité a expiré ou a déjà été utilisé.");
       } finally {
-        setVerifying(false);
+        if (isMounted) setVerifying(false);
       }
     };
 
     verifyToken();
+
+    return () => {
+      isMounted = false;
+    };
   }, [searchParams, supabase.auth]);
 
   const handleReset = async (e: React.FormEvent) => {

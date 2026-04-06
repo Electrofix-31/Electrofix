@@ -32,12 +32,13 @@ export async function POST(request: Request) {
 
     if (linkError) return NextResponse.json({ message: 'Si cet email existe, un message a été envoyé.' });
 
-    // EXTRACTION DU TOKEN_HASH : C'est plus fiable car il ne nécessite pas l'email pour être vérifié
+    // EXTRACTION DU TOKEN : Supabase place le jeton long dans le paramètre 'token' de l'action_link
     const linkURL = new URL(data.properties.action_link);
-    const tokenHash = linkURL.searchParams.get('token_hash'); 
+    const token = linkURL.searchParams.get('token'); 
 
     // On crée notre propre lien direct vers la page de reset
-    const directResetLink = `${origin}/auth/reset-password?token_hash=${tokenHash}`;
+    // On le nomme token_hash dans notre URL car c'est ce que la fonction verifyOtp attend
+    const directResetLink = `${origin}/auth/reset-password?token_hash=${token}`;
 
     if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: 'Config Resend manquante' }, { status: 500 });
 
