@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { LayoutDashboard, Users, Calendar, Package, Mail, Settings, LogOut, Shield } from 'lucide-react';
 import Link from 'next/link';
 import AdminLoginForm from '@/components/admin/AdminLoginForm';
+import LogoutButton from '@/components/admin/LogoutButton';
 
 export default async function AdminLayout({
   children,
@@ -94,9 +95,7 @@ export default async function AdminLayout({
           <Link href="/admin/settings" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400">
             <Settings className="w-5 h-5" /> Paramètres
           </Link>
-          <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-red-900/30 text-red-400 transition-colors">
-            <LogOut className="w-5 h-5" /> Déconnexion
-          </button>
+          <LogoutButton />
         </div>
       </aside>
 
