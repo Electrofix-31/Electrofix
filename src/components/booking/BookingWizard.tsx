@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
-import { Wrench, MapPin, Calendar, User, CreditCard, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+import { Wrench, MapPin, Calendar, User, CreditCard, ChevronRight, ChevronLeft, Loader2, Mail } from 'lucide-react';
 import StripeWrapper from './StripeWrapper';
 import PaymentForm from './PaymentForm';
 
-type Step = 'type' | 'service' | 'slot' | 'info' | 'auth' | 'payment';
+type Step = 'type' | 'postal' | 'service' | 'slot' | 'info' | 'auth' | 'review' | 'payment';
 
 export default function BookingWizard() {
   const [step, setStep] = useState<Step>('type');
@@ -16,6 +16,7 @@ export default function BookingWizard() {
 
   // Form State
   const [appointmentType, setAppointmentType] = useState<'atelier' | 'domicile' | null>(null);
+  const [postalCode, setPostalCode] = useState<string>('');
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
@@ -28,8 +29,8 @@ export default function BookingWizard() {
     issue: '',
   });
 
-  // Auth State
-  const [otpCode, setOtpCode] = useState('');
+  // Auth State (Magic Link)
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   // Stripe
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -54,35 +55,43 @@ export default function BookingWizard() {
   // Load slots when date changes
   useEffect(() => {
     if (selectedDate && appointmentType) {
-      // Si c'est à domicile, on essaie d'envoyer le code postal s'il a déjà été tapé (ex: retour arrière)
-      const postalCodeMatch = clientInfo.address.match(/\b\d{5}\b/);
-      const postalCodeQuery = postalCodeMatch ? `&postal_code=${postalCodeMatch[0]}` : '';
+      // On envoie le code postal s'il a été saisi (pour l'optimisation géo)
+      const postalCodeQuery = postalCode ? `&postal_code=${postalCode}` : '';
 
       fetch(`/api/appointments/slots?service_type=${appointmentType}&date=${selectedDate}${postalCodeQuery}`)
         .then(res => res.json())
         .then(data => setSlots(data))
         .catch(err => console.error('Error fetching slots:', err));
     }
-  }, [selectedDate, appointmentType, clientInfo.address]);
+  }, [selectedDate, appointmentType, postalCode]);
 
   const handleNext = async () => {
-    if (step === 'type' && appointmentType) setStep('service');
+    if (step === 'type') {
+      if (appointmentType === 'domicile') setStep('postal');
+      else setStep('service');
+    }
+    else if (step === 'postal' && postalCode.length === 5) setStep('service');
     else if (step === 'service' && selectedService) setStep('slot');
     else if (step === 'slot' && selectedSlot) setStep('info');
     else if (step === 'info') {
       await handleAuthCheck();
     }
-    else if (step === 'auth') {
-      await verifyOtpAndBook();
+    else if (step === 'review') {
+      await createAppointment();
     }
   };
 
   const handleBack = () => {
-    if (step === 'service') setStep('type');
+    if (step === 'postal') setStep('type');
+    else if (step === 'service') {
+      if (appointmentType === 'domicile') setStep('postal');
+      else setStep('type');
+    }
     else if (step === 'slot') setStep('service');
     else if (step === 'info') setStep('slot');
     else if (step === 'auth') setStep('info');
-    else if (step === 'payment') setStep('info');
+    else if (step === 'review') setStep('info');
+    else if (step === 'payment') setStep('review');
   };
 
   const handleAuthCheck = async () => {
@@ -90,17 +99,24 @@ export default function BookingWizard() {
     setError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const cleanEmail = clientInfo.email.trim().toLowerCase();
       
-      if (session) {
-        // Déjà connecté
-        await createAppointment();
+      // Si déjà connecté AVEC LE MÊME EMAIL -> On passe au récapitulatif
+      if (session && session.user.email === cleanEmail) {
+        setStep('review');
       } else {
-        // Pas connecté, on envoie un code OTP
-        if (!clientInfo.email) throw new Error("Veuillez renseigner un email valide.");
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-          email: clientInfo.email,
+        // Si connecté avec un AUTRE email -> On déconnecte d'abord
+        if (session) {
+          await supabase.auth.signOut();
+        }
+
+        // On envoie le lien magique (Magic Link)
+        if (!cleanEmail) throw new Error("Veuillez renseigner un email valide.");
+        
+        const { error: magicError } = await supabase.auth.signInWithOtp({
+          email: cleanEmail,
           options: {
-            // Optionnel: on peut ajouter les données du profil pour la première inscription ici
+            emailRedirectTo: `${window.location.origin}/book?step=review`,
             data: {
               full_name: clientInfo.name,
               phone: clientInfo.phone,
@@ -108,7 +124,8 @@ export default function BookingWizard() {
           }
         });
         
-        if (otpError) throw otpError;
+        if (magicError) throw magicError;
+        setMagicLinkSent(true);
         setStep('auth');
       }
     } catch (err: any) {
@@ -118,25 +135,46 @@ export default function BookingWizard() {
     }
   };
 
-  const verifyOtpAndBook = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email: clientInfo.email,
-        token: otpCode,
-        type: 'email'
-      });
+  // Suppression de verifyOtpAndBook car on utilise maintenant un lien direct
 
-      if (verifyError) throw verifyError;
-
-      // OTP validé, on lance la réservation
-      await createAppointment();
-    } catch (err: any) {
-      setError(err.message || 'Code invalide.');
-      setLoading(false);
+  // Auto-step from URL (Magic Link Redirect)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlStep = params.get('step');
+    
+    // Récupérer les données stockées
+    const savedData = sessionStorage.getItem('pending_booking');
+    
+    if (savedData) {
+      const parsed = JSON.parse(savedData);
+      setAppointmentType(parsed.type);
+      setPostalCode(parsed.postalCode || '');
+      setSelectedService(parsed.service);
+      setSelectedDate(parsed.date);
+      setSelectedSlot(parsed.slot);
+      setClientInfo(parsed.info);
+      
+      if (urlStep === 'review') {
+        setStep('review');
+        // Nettoyer l'URL sans recharger
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
-  };
+  }, []);
+
+  // Sauvegarde automatique à chaque changement d'étape pour ne rien perdre
+  useEffect(() => {
+    if (step !== 'type') {
+      sessionStorage.setItem('pending_booking', JSON.stringify({
+        type: appointmentType,
+        postalCode,
+        service: selectedService,
+        date: selectedDate,
+        slot: selectedSlot,
+        info: clientInfo
+      }));
+    }
+  }, [step, appointmentType, postalCode, selectedService, selectedDate, selectedSlot, clientInfo]);
 
   const createAppointment = async () => {
     setLoading(true);
@@ -225,7 +263,7 @@ export default function BookingWizard() {
                 <button
                   onClick={() => {
                     setAppointmentType('domicile');
-                    setStep('service');
+                    setStep('postal');
                   }}
                   className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${
                     appointmentType === 'domicile' ? 'border-primary bg-blue-50/50' : 'border-slate-100 hover:border-blue-200'
@@ -239,6 +277,42 @@ export default function BookingWizard() {
                     <p className="text-slate-500 text-sm">Un technicien se déplace chez vous pour réparer.</p>
                   </div>
                 </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'postal' && (
+            <motion.div
+              key="postal"
+              initial={{ opacity: 1, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6 text-center"
+            >
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-primary mx-auto mb-4">
+                <MapPin className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Quelle est votre zone ?</h2>
+              <p className="text-slate-600">
+                Saisissez votre code postal pour que nous puissions optimiser le trajet de votre technicien.
+              </p>
+              <div className="max-w-[200px] mx-auto pt-4">
+                <input
+                  type="text"
+                  placeholder="Ex: 31000"
+                  maxLength={5}
+                  autoFocus
+                  className="w-full p-4 text-center text-2xl font-bold rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:outline-none"
+                  value={postalCode}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                    setPostalCode(val);
+                    if (val.length === 5) {
+                      // On attend un tout petit peu pour laisser l'utilisateur voir son code
+                      setTimeout(() => setStep('service'), 300);
+                    }
+                  }}
+                />
               </div>
             </motion.div>
           )}
@@ -325,11 +399,10 @@ export default function BookingWizard() {
                 <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 text-sm text-blue-800 flex items-start gap-3">
                    <MapPin className="w-5 h-5 shrink-0 mt-0.5" />
                    <p>
-                     <strong>Astuce écolo :</strong> Lors de l&apos;étape suivante, en renseignant votre adresse, nous mettrons en évidence les créneaux où un technicien est déjà dans votre secteur.
+                     <strong>Astuce écologique :</strong> Lors de l&apos;étape suivante, en renseignant votre adresse, nous mettrons en évidence les créneaux où un technicien est déjà dans votre secteur.
                    </p>
                 </div>
-              )}
-            </motion.div>
+              )}            </motion.div>
           )}
 
           {step === 'info' && (
@@ -376,13 +449,33 @@ export default function BookingWizard() {
                   placeholder="Référence de l'appareil (ex: Samsung S21)"
                   className="w-full p-4 rounded-xl border border-slate-200 mb-4"
                   value={clientInfo.material_ref}
-                  onChange={e => setClientInfo({ ...clientInfo, material_ref: e.target.value })}
+                  onChange={e => {
+                    const newInfo = { ...clientInfo, material_ref: e.target.value };
+                    setClientInfo(newInfo);
+                    sessionStorage.setItem('pending_booking', JSON.stringify({
+                      type: appointmentType,
+                      service: selectedService,
+                      date: selectedDate,
+                      slot: selectedSlot,
+                      info: newInfo
+                    }));
+                  }}
                 />
                 <textarea
                   placeholder="Description de la panne"
                   className="w-full p-4 rounded-xl border border-slate-200 min-h-[100px]"
                   value={clientInfo.issue}
-                  onChange={e => setClientInfo({ ...clientInfo, issue: e.target.value })}
+                  onChange={e => {
+                    const newInfo = { ...clientInfo, issue: e.target.value };
+                    setClientInfo(newInfo);
+                    sessionStorage.setItem('pending_booking', JSON.stringify({
+                      type: appointmentType,
+                      service: selectedService,
+                      date: selectedDate,
+                      slot: selectedSlot,
+                      info: newInfo
+                    }));
+                  }}
                 />
               </div>
             </motion.div>
@@ -397,23 +490,78 @@ export default function BookingWizard() {
               className="space-y-6 text-center max-w-md mx-auto"
             >
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-primary mx-auto mb-4">
-                <User className="w-8 h-8" />
+                <Mail className="w-8 h-8" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Vérification de votre email</h2>
+              <h2 className="text-2xl font-bold text-slate-800">Lien de validation envoyé</h2>
               <p className="text-slate-600">
-                Nous avons envoyé un code de confirmation à <strong>{clientInfo.email}</strong>.
-                Veuillez le saisir ci-dessous pour confirmer votre identité.
+                Nous avons envoyé un lien de confirmation à <strong>{clientInfo.email}</strong>.
               </p>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-500">
+                Cliquez sur le lien contenu dans l&apos;email pour valider votre identité et finaliser votre réservation. 
+                <br/><br/>
+                <em>Cette fenêtre se mettra à jour automatiquement après votre clic.</em>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'review' && (
+            <motion.div
+              key="review"
+              initial={{ opacity: 1, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <h2 className="text-2xl font-bold text-slate-800">Récapitulatif de votre commande</h2>
               
-              <div className="pt-4">
-                <input
-                  type="text"
-                  placeholder="Code de confirmation"
-                  maxLength={8}
-                  className="w-full p-4 text-center text-2xl tracking-widest font-bold rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:outline-none"
-                  value={otpCode}
-                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Service & RDV</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 font-medium">Type :</span>
+                      <span className="font-bold capitalize">{appointmentType}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 font-medium">Prestation :</span>
+                      <span className="font-bold text-primary">{selectedService?.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 font-medium">Date :</span>
+                      <span className="font-bold">{selectedDate}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-600 font-medium">Heure :</span>
+                      <span className="font-bold">{selectedSlot?.start_time.slice(0, 5)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Vos Coordonnées</h3>
+                  <div className="space-y-3">
+                    <p className="text-slate-800 font-bold">{clientInfo.name}</p>
+                    <p className="text-slate-600 text-sm">{clientInfo.email}</p>
+                    <p className="text-slate-600 text-sm">{clientInfo.phone}</p>
+                    {appointmentType === 'domicile' && (
+                      <p className="text-slate-600 text-sm italic">{clientInfo.address}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-primary">Total à régler maintenant</h4>
+                  <p className="text-xs text-primary/60">Paiement sécurisé par Stripe</p>
+                </div>
+                <div className="text-3xl font-black text-primary">
+                  {selectedService?.price}€
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 italic">
+                En cliquant sur &quot;Procéder au paiement&quot;, vous confirmez l&apos;exactitude des informations ci-dessus.
               </div>
             </motion.div>
           )}
@@ -468,15 +616,17 @@ export default function BookingWizard() {
             disabled={
               loading ||
               (step === 'type' && !appointmentType) ||
+              (step === 'postal' && postalCode.length < 5) ||
               (step === 'service' && !selectedService) ||
               (step === 'slot' && (!selectedSlot || !selectedDate)) ||
-              (step === 'auth' && otpCode.length < 6)
+              (step === 'info' && (!clientInfo.email || !clientInfo.name)) ||
+              (step === 'auth' && !magicLinkSent)
             }
             className="bg-primary text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
-                {step === 'info' ? 'Vérifier l\'identité' : step === 'auth' ? 'Procéder au paiement' : 'Continuer'} <ChevronRight className="w-5 h-5" />
+                {step === 'info' ? 'Vérifier l\'identité' : step === 'review' ? 'Procéder au paiement' : 'Continuer'} <ChevronRight className="w-5 h-5" />
               </>
             )}
           </button>
