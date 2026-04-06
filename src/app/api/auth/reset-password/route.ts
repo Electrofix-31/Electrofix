@@ -15,38 +15,33 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // --- LOGIQUE DE DÉTERMINATION DE L'URL (SÉCURISÉE) ---
-    // On utilise SITE_URL (sans NEXT_PUBLIC) pour qu'elle soit lue en direct sur le serveur
+    // Détermination de l'origine
     let origin = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL;
-    
-    // Si toujours rien, on regarde les headers
-    if (!origin || origin.includes('localhost')) {
+    if (!origin) {
       const host = request.headers.get('host');
       const protocol = request.headers.get('x-forwarded-proto') || 'https';
       origin = `${protocol}://${host}`;
     }
-
-    // Sécurité ultime : si on est sur zapto.org mais que l'origin est localhost, on force zapto
-    if (origin.includes('localhost') && request.headers.get('host')?.includes('zapto.org')) {
-       origin = `https://${request.headers.get('host')}`;
-    }
-
     origin = origin.replace(/\/$/, '');
-    console.log('>>> RESET PASSWORD ORIGIN UTILISÉE :', origin);
 
+    // 1. Générer le lien de récupération via Supabase
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
-      email: email,
-      options: {
-        redirectTo: `${origin}/auth/callback?next=/auth/reset-password`,
-      }
+      email: email
     });
 
     if (linkError) return NextResponse.json({ message: 'Si cet email existe, un message a été envoyé.' });
 
-    const resetLink = data.properties.action_link;
+    // EXTRACTION DU TOKEN_HASH : C'est plus fiable car il ne nécessite pas l'email pour être vérifié
+    const linkURL = new URL(data.properties.action_link);
+    const tokenHash = linkURL.searchParams.get('token_hash'); 
+
+    // On crée notre propre lien direct vers la page de reset
+    const directResetLink = `${origin}/auth/reset-password?token_hash=${tokenHash}`;
+
     if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: 'Config Resend manquante' }, { status: 500 });
 
+    // 2. Envoyer l'email via Resend
     const { error: sendError } = await resend.emails.send({
       from: 'ElectroFix <noreply@electrofix.badie.ovh>',
       to: email,
@@ -55,11 +50,16 @@ export async function POST(request: Request) {
         <div style="font-family: sans-serif; padding: 20px; color: #334155;">
           <h1 style="color: #0f172a;">Réinitialisation de mot de passe</h1>
           <p>Bonjour,</p>
-          <p>Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe :</p>
-          <a href="${resetLink}" style="display: inline-block; background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">
-            Réinitialiser mon mot de passe
+          <p>Pour définir votre nouveau mot de passe, veuillez cliquer sur le bouton ci-dessous :</p>
+          <a href="${directResetLink}" style="display: inline-block; background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">
+            Changer mon mot de passe
           </a>
-          <p>Si le bouton ne fonctionne pas, copiez ce lien : ${resetLink}</p>
+          <p style="font-size: 12px; color: #64748b; margin-top: 20px;">
+            Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br/>
+            ${directResetLink}
+          </p>
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8;">Ce lien est valable 1 heure.</p>
         </div>
       `,
     });
