@@ -140,8 +140,27 @@ Une console de démarrage propre, sans avertissements, et un projet aligné sur 
 
 ---
 
-## [06/04/2026] - Sécurité Bancaire et Recette Stripe
+## [06/04/2026] - Portail Admin "No-Code" : Gestion de l'Équipe et RH
 
+### Problématique
+Le moteur de planning reposait sur des données "en dur" dans le code pour la simulation, ce qui empêchait la gérante de piloter son entreprise en toute autonomie.
+
+### Analyse & Logique
+*   Conformément au mandat n°3, l'interface doit permettre de gérer les rôles et les effectifs sans console ni SQL.
+*   Séparation nette entre la logique mathématique (le moteur) et les données métier (l'équipe réelle).
+
+### Décision / Solution
+1.  **Interface Techniciens** : Création d'un tableau de bord pour promouvoir des utilisateurs et définir leur type d'intervention (Magasin/Terrain).
+2.  **Paramètres RH** : Création d'une page de réglages pour le seuil de sécurité et le personnel fixe.
+3.  **Débridage API** : Passage de l'API des créneaux sur un mode 100% réel (lecture exclusive de la base de données).
+
+### Résultat
+Une application totalement pilotable par une utilisatrice non-technicienne. Le planning "respire" désormais en fonction de la réalité humaine du magasin.
+
+---
+
+## [06/04/2026] - Sécurité Bancaire et Recette Stripe
+...
 ### Problématique
 Lors des tests multi-comptes, la même carte bancaire apparaissait suggérée dans le formulaire Stripe, soulevant une question sur la séparation des données clients.
 
