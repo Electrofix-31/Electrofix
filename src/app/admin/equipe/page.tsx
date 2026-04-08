@@ -40,11 +40,32 @@ export default function TechniciansPage() {
     setLoading(false);
   };
 
-  const toggleAvailability = async (id: string, field: 'is_available_store' | 'is_available_field', currentVal: boolean) => {
-    setActionLoading(`${id}-${field}`);
-    await supabase.from('technicians').update({ [field]: !currentVal }).eq('id', id);
-    await fetchTechs();
-    setActionLoading(null);
+  const toggleAvailability = async (profileId: string, field: 'is_available_store' | 'is_available_field', currentVal: boolean) => {
+    setActionLoading(`${profileId}-${field}`);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log(`[DEBUG] Tentative update par l'utilisateur:`, user?.email);
+      console.log(`[DEBUG] Update de profile_id: ${profileId}, champ: ${field}, future valeur: ${!currentVal}`);
+
+      const { data, error } = await supabase
+        .from('technicians')
+        .update({ [field]: !currentVal })
+        .eq('profile_id', profileId)
+        .select();
+      
+      if (error) {
+        console.error("[DEBUG] Erreur Supabase:", error);
+        throw error;
+      }
+      
+      console.log(`[DEBUG] Résultat de l'update:`, data);
+      await fetchTechs();
+    } catch (err: any) {
+      console.error("[DEBUG] Erreur catch:", err);
+      alert("Erreur de mise à jour : " + (err.message || JSON.stringify(err)));
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const addTech = async (e: React.FormEvent) => {
@@ -88,21 +109,28 @@ export default function TechniciansPage() {
     }
   };
 
-  const removeTech = async (techId: string, profileId: string) => {
+  const removeTech = async (profileId: string) => {
     if (!confirm("Voulez-vous vraiment retirer cette personne de l'équipe ? Elle redeviendra un simple client.")) return;
     
-    setActionLoading(techId);
-    // 1. Supprimer la fiche technique
-    await supabase.from('technicians').delete().eq('id', techId);
-    
-    // 2. Repasser en rôle client si ce n'est pas un admin
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', profileId).single();
-    if (profile?.role === 'technician') {
-      await supabase.from('profiles').update({ role: 'client' }).eq('id', profileId);
-    }
+    setActionLoading(profileId);
+    try {
+      // 1. Supprimer la fiche technique
+      const { error: deleteError } = await supabase.from('technicians').delete().eq('profile_id', profileId);
+      if (deleteError) throw deleteError;
+      
+      // 2. Repasser en rôle client si ce n'est pas un admin (utilise maybeSingle au lieu de single pour ne pas crasher si le profil est introuvable)
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', profileId).maybeSingle();
+      if (profile && profile.role === 'technician') {
+        const { error: updateError } = await supabase.from('profiles').update({ role: 'client' }).eq('id', profileId);
+        if (updateError) throw updateError;
+      }
 
-    await fetchTechs();
-    setActionLoading(null);
+      await fetchTechs();
+    } catch (err: any) {
+      alert("Erreur lors de la suppression : " + err.message);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -142,9 +170,9 @@ export default function TechniciansPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {techs.map(tech => (
-            <div key={tech.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all relative group">
+            <div key={tech.profile_id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all relative group">
               <button 
-                onClick={() => removeTech(tech.id, tech.profile_id)}
+                onClick={() => removeTech(tech.profile_id)}
                 className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
               >
                 <Trash2 className="w-5 h-5" />
@@ -152,12 +180,14 @@ export default function TechniciansPage() {
 
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-accent font-black">
-                  {tech.profiles?.email?.[0].toUpperCase()}
+                  {tech.profiles?.email?.[0]?.toUpperCase() || '?'}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 truncate max-w-[150px]">{tech.profiles?.email?.split('@')[0]}</h3>
+                  <h3 className="font-bold text-slate-900 truncate max-w-[150px]">
+                    {tech.profiles?.email ? tech.profiles.email.split('@')[0] : 'Profil Inconnu'}
+                  </h3>
                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <Mail className="w-3 h-3" /> {tech.profiles?.email}
+                    <Mail className="w-3 h-3" /> {tech.profiles?.email || 'Email supprimé'}
                     {tech.profiles?.role === 'admin' && <span className="ml-1 text-purple-600 font-black underline">ADMIN</span>}
                   </div>
                 </div>
@@ -165,8 +195,8 @@ export default function TechniciansPage() {
 
               <div className="space-y-3">
                 <button 
-                  onClick={() => toggleAvailability(tech.id, 'is_available_store', tech.is_available_store)}
-                  disabled={actionLoading === `${tech.id}-is_available_store`}
+                  onClick={() => toggleAvailability(tech.profile_id, 'is_available_store', tech.is_available_store)}
+                  disabled={actionLoading === `${tech.profile_id}-is_available_store`}
                   className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
                     tech.is_available_store ? 'border-blue-100 bg-blue-50 text-blue-700 font-bold' : 'border-slate-50 bg-slate-50 text-slate-300'
                   }`}
@@ -176,8 +206,8 @@ export default function TechniciansPage() {
                 </button>
 
                 <button 
-                  onClick={() => toggleAvailability(tech.id, 'is_available_field', tech.is_available_field)}
-                  disabled={actionLoading === `${tech.id}-is_available_field`}
+                  onClick={() => toggleAvailability(tech.profile_id, 'is_available_field', tech.is_available_field)}
+                  disabled={actionLoading === `${tech.profile_id}-is_available_field`}
                   className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
                     tech.is_available_field ? 'border-orange-100 bg-orange-50 text-orange-700 font-bold' : 'border-slate-50 bg-slate-50 text-slate-300'
                   }`}

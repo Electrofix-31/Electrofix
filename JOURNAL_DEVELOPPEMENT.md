@@ -24,6 +24,29 @@ Un flux de gestion humain et logique pour la gérante, garantissant un planning 
 
 ---
 
+## [08/04/2026] - Refonte Intégrale de la Réservation & Algorithme de Tournée
+
+### Problématique
+Le parcours de réservation initial ("Choix de prestation") manquait de précision pour les techniciens (pas de type d'appareil, pas de garantie, pas de photos de la panne). De plus, le moteur de planification autorisait des "zigzags" géographiques intenables pour un technicien unique (ex: Carbonne à 8h, Toulouse à 10h) et bloquait parfois les créneaux pour des règles RH inadaptées au futur.
+
+### Analyse & Logique
+*   **Parcours Client** : Il faut demander *l'appareil* (Catégorie > Type) plutôt que le *service*. Le système doit en déduire le prix du forfait (Atelier ou Domicile).
+*   **Acompte "Anti-Lapin"** : On ne facture plus une réparation à l'avance, mais un Forfait de Déplacement/Diagnostic, sécurisant ainsi l'intervention sans flouer le client.
+*   **Géo-Optimisation ("Tournée Unique Anti-Zigzag")** : Pour rationaliser les coûts, on limite le terrain à 1 technicien simultané.
+    *   *Règle 1 (Ancrage)* : Impossible d'intervenir à plus de X km (ex: 20km) du point central (Carbonne).
+    *   *Règle 2 (Anti-Zigzag)* : Impossible de prendre un RDV à plus de 10km du client précédent ou suivant si l'intervalle de temps est court (< 2h).
+
+### Décision / Solution
+1.  **Base de données "No-Code"** : Création des tables `equipment_categories`, `equipment_types`, et `warranty_types`.
+2.  **Paramètres Admin** : Ajout d'une interface complète (`/admin/settings`) pour que la gérante modifie les familles, les appareils, les prix des forfaits, et le rayon d'intervention maximal.
+3.  **Refonte du BookingWizard** : Intégration du choix d'appareil, ajout de l'upload de 3 fichiers (vers Supabase Storage), et modification de l'étape "Review" pour un récapitulatif ultra-précis.
+4.  **Moteur API `slots`** : Suppression du blocage RH strict pour le terrain (remplacé par une alerte visuelle) et implémentation de l'algorithme de distance séquentielle.
+
+### Résultat
+Une prise de rendez-vous digne d'un grand réseau national. Le client fournit un dossier complet (photos, garantie) et l'algorithme garantit que le technicien ne fera jamais de détours absurdes.
+
+---
+
 ## [06/04/2026] - Standardisation ES Modules (ESM)
 
 ### Problématique

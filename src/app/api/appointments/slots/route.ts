@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { calculateDistance, getCoordinatesFromPostalCode } from '@/lib/geo';
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -10,7 +11,14 @@ export async function GET(request: Request) {
 
   if (!service_type || !date) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
 
-  // 1. Récupérer les créneaux configurés
+  // 1. Récupérer les réglages Admin (Rayon max)
+  const { data: radiusSetting } = await supabase.from('admin_settings').select('value').eq('key', 'max_intervention_radius').single();
+  const maxRadius = radiusSetting?.value?.value ?? 20;
+
+  // 2. Point central : Carbonne (31390)
+  const STORE_COORDS = { lat: 43.2974, lon: 1.2268 }; // Coordonnées approximatives de Carbonne centre
+
+  // 3. Récupérer les créneaux configurés
   const { data: availableSlots } = await supabase
     .from('appointment_slots')
     .select('*')
@@ -18,55 +26,78 @@ export async function GET(request: Request) {
     .eq('is_active', true)
     .order('start_time', { ascending: true });
 
-  // 2. Récupérer les réglages RH réels de l'Admin
-  const { data: adminSettings } = await supabase.from('admin_settings').select('key, value');
-  const minStaffRequired = adminSettings?.find(s => s.key === 'min_staff_store')?.value?.value ?? 3;
-  const fixedStaffCount = adminSettings?.find(s => s.key === 'fixed_staff_store')?.value?.value ?? 2;
-
-  // 3. Récupérer l'équipe de techniciens réelle
-  const { data: techs } = await supabase.from('technicians').select('*');
-  const totalStoreStaff = techs?.filter(t => t.is_available_store).length || 0;
-  const totalFieldCapacity = techs?.filter(t => t.is_available_field).length || 0;
-
-  // 4. Récupérer les RDV déjà confirmés
+  // 4. Récupérer les RDV déjà confirmés pour cette date
   const { data: bookedAppointments } = await supabase
     .from('appointments')
-    .select('time, appointment_type, status, client_postal_code')
+    .select('time, appointment_type, status, client_postal_code, latitude, longitude')
     .eq('date', date)
     .neq('status', 'cancelled');
 
-  // Logs pour suivi Admin (Optionnel en prod)
-  const [y, m, d] = date.split('-');
-  console.log(`[Slots API] ${d}/${m}/${y} - Base: ${techs?.length || 0} techs configurés.`);
+  // 5. Vérification de la zone géographique globale (Rayon de Carbonne)
+  let isOutsideStoreZone = false;
+  let clientCoords: { lat: number, lon: number } | null = null;
+  
+  if (service_type === 'domicile' && postal_code) {
+    clientCoords = await getCoordinatesFromPostalCode(postal_code);
+    if (clientCoords) {
+      const distanceToStore = calculateDistance(clientCoords.lat, clientCoords.lon, STORE_COORDS.lat, STORE_COORDS.lon);
+      if (distanceToStore > maxRadius) {
+        isOutsideStoreZone = true;
+      }
+    }
+  }
 
-  // 5. Calcul des disponibilités dynamiques
+  // 6. Calcul des disponibilités finales avec Proximité Séquentielle
   const finalSlots = (availableSlots || []).map(slot => {
     const timeStr = slot.start_time;
 
-    const fieldAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'domicile').length || 0;
+    const fieldAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'domicile') || [];
     const storeAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'atelier').length || 0;
 
-    // Logique RH
-    const techAtStore = totalStoreStaff - fieldAppsAtTime;
-    const currentStoreStaff = fixedStaffCount + techAtStore - storeAppsAtTime;
-    const isStoreRuleRespected = currentStoreStaff >= minStaffRequired;
+    let isAvailable = false;
+    let isRecommended = false;
 
-    // Capacité Terrain
-    const remainingFieldTechs = totalFieldCapacity - fieldAppsAtTime;
-    const canSendOneMoreToField = (fixedStaffCount + (techAtStore - 1)) >= minStaffRequired;
+    if (service_type === 'atelier') {
+      isAvailable = storeAppsAtTime < slot.max_capacity_store;
+    } else {
+      // DOMICILE : Règle 1 : Zone globale & Créneau libre
+      isAvailable = !isOutsideStoreZone && fieldAppsAtTime.length < 1;
 
-    const isAvailable = service_type === 'atelier'
-      ? (isStoreRuleRespected && storeAppsAtTime < slot.max_capacity_store)
-      : (remainingFieldTechs > 0 && canSendOneMoreToField && fieldAppsAtTime < slot.max_capacity_field);
+      // DOMICILE : Règle 2 : Proximité Séquentielle (Anti-Zigzag)
+      if (isAvailable && clientCoords) {
+        const MAX_SEQUENTIAL_DISTANCE = 10; // km max entre deux RDV consécutifs
+        const slotHour = parseInt(timeStr.split(':')[0]);
 
-    const isRecommended = service_type === 'domicile' && postal_code && 
-                         bookedAppointments?.some(a => a.appointment_type === 'domicile' && a.client_postal_code === postal_code);
+        // On cherche les RDV Domicile du même jour
+        const allFieldAppsToday = bookedAppointments?.filter(a => a.appointment_type === 'domicile' && a.latitude && a.longitude) || [];
+
+        for (const app of allFieldAppsToday) {
+          const appHour = parseInt(app.time.split(':')[0]);
+          // Est-ce un RDV "adjacent" (juste avant ou juste après, ex: 2h de battement)
+          const isAdjacent = Math.abs(appHour - slotHour) <= 2; 
+
+          if (isAdjacent) {
+            const distanceToAdjacent = calculateDistance(clientCoords.lat, clientCoords.lon, app.latitude, app.longitude);
+            if (distanceToAdjacent > MAX_SEQUENTIAL_DISTANCE) {
+              isAvailable = false; // Trop loin du RDV précédent/suivant pour ce créneau !
+              break; // Inutile de vérifier les autres
+            }
+          }
+        }
+      }
+      
+      // On recommande si on est dans le même code postal
+      isRecommended = isAvailable && postal_code && bookedAppointments?.some(a => 
+        a.appointment_type === 'domicile' && a.client_postal_code === postal_code
+      ) || false;
+    }
 
     return {
       ...slot,
       is_available_for_service: isAvailable,
-      is_recommended: isRecommended || false,
-      remaining_capacity: service_type === 'domicile' ? remainingFieldTechs : currentStoreStaff
+      is_recommended: isRecommended,
+      remaining_capacity: isAvailable ? 1 : 0,
+      is_too_far: isOutsideStoreZone
     };
   }).filter(slot => slot.is_available_for_service);
 

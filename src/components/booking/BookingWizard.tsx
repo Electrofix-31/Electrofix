@@ -7,7 +7,7 @@ import { Wrench, MapPin, Calendar, User, CreditCard, ChevronRight, ChevronLeft, 
 import StripeWrapper from './StripeWrapper';
 import PaymentForm from './PaymentForm';
 
-type Step = 'type' | 'postal' | 'service' | 'equipment' | 'slot' | 'info' | 'auth' | 'review' | 'payment';
+type Step = 'type' | 'postal' | 'equipment' | 'slot' | 'info' | 'auth' | 'review' | 'payment';
 
 export default function BookingWizard() {
   const [mounted, setMounted] = useState(false);
@@ -51,7 +51,6 @@ export default function BookingWizard() {
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
 
   // Data
-  const [services, setServices] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
 
   const supabase = createClient();
@@ -61,18 +60,44 @@ export default function BookingWizard() {
     setMounted(true);
   }, []);
 
-  // Load equipment data
+  // Load basic data (Categories, Warranties, Services)
   useEffect(() => {
     if (mounted) {
       const fetchData = async () => {
+        // Chargement simple des catégories
         const { data: catData } = await supabase.from('equipment_categories').select('*').order('name');
         const { data: warData } = await supabase.from('warranty_types').select('*').order('name');
+        const { data: servData } = await supabase.from('services').select('*');
+        
         setCategories(catData || []);
         setWarrantyTypes(warData || []);
+        
+        // On stocke tous les services pour pouvoir les chercher ensuite
+        if (servData) {
+          // Astuce : on stocke ça dans le localStorage temporairement ou on utilise un state local
+          window.sessionStorage.setItem('all_services', JSON.stringify(servData));
+        }
       };
       fetchData();
     }
   }, [mounted]);
+
+  // Déterminer le service (prix) quand le type de rdv change (Logique Anti-Lapin)
+  useEffect(() => {
+    if (appointmentType) {
+      const storedServices = window.sessionStorage.getItem('all_services');
+      if (storedServices) {
+        const allServices = JSON.parse(storedServices);
+        // On cherche le service global de déplacement/diagnostic
+        const service = allServices.find((s: any) => 
+          appointmentType === 'atelier' 
+            ? s.name.toLowerCase().includes('atelier') || s.name.toLowerCase().includes('diagnostic')
+            : s.name.toLowerCase().includes('domicile') || s.name.toLowerCase().includes('déplacement')
+        );
+        setSelectedService(service || allServices[0]); // Fallback au premier service si non trouvé
+      }
+    }
+  }, [appointmentType]);
 
   // Load equipment types when category changes
   useEffect(() => {
@@ -87,13 +112,23 @@ export default function BookingWizard() {
     }
   }, [selectedCategoryId]);
 
+  // Load slots when date changes
+  useEffect(() => {
+    if (selectedDate && appointmentType) {
+      const postalCodeQuery = postalCode ? `&postal_code=${postalCode}` : '';
+      fetch(`/api/appointments/slots?service_type=${appointmentType}&date=${selectedDate}${postalCodeQuery}`)
+        .then(res => res.json())
+        .then(data => setSlots(data))
+        .catch(err => console.error('Error fetching slots:', err));
+    }
+  }, [selectedDate, appointmentType, postalCode]);
+
   const handleNext = async () => {
     if (step === 'type') {
       if (appointmentType === 'domicile') setStep('postal');
-      else setStep('service');
+      else setStep('equipment');
     }
-    else if (step === 'postal' && postalCode.length === 5) setStep('service');
-    else if (step === 'service' && selectedService) setStep('equipment');
+    else if (step === 'postal' && postalCode.length === 5) setStep('equipment');
     else if (step === 'equipment' && (selectedEquipmentTypeId || customQuestion)) setStep('slot');
     else if (step === 'slot' && selectedSlot) setStep('info');
     else if (step === 'info') {
@@ -106,11 +141,10 @@ export default function BookingWizard() {
 
   const handleBack = () => {
     if (step === 'postal') setStep('type');
-    else if (step === 'service') {
+    else if (step === 'equipment') {
       if (appointmentType === 'domicile') setStep('postal');
       else setStep('type');
     }
-    else if (step === 'equipment') setStep('service');
     else if (step === 'slot') setStep('equipment');
     else if (step === 'info') setStep('slot');
     else if (step === 'auth') setStep('info');
@@ -166,10 +200,12 @@ export default function BookingWizard() {
   useEffect(() => {
     if (!mounted) return;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Si l'utilisateur se connecte (via un autre onglet), on le passe au récapitulatif
-        if (step === 'auth') {
+        // Si l'utilisateur se connecte (via un autre onglet), on bascule l'onglet actuel
+        if (step === 'auth' || step === 'info') {
+          // On attend un tout petit peu pour laisser le temps aux cookies de se poser
+          await new Promise(resolve => setTimeout(resolve, 500));
           setStep('review');
         }
       }
@@ -197,26 +233,20 @@ export default function BookingWizard() {
       setSelectedDate(parsed.date);
       setSelectedSlot(parsed.slot);
       setClientInfo(parsed.info);
+      setSelectedCategoryId(parsed.categoryId || '');
+      setSelectedEquipmentTypeId(parsed.equipmentTypeId || '');
+      setSelectedWarrantyTypeId(parsed.warrantyTypeId || '');
+      setCustomQuestion(parsed.customQuestion || '');
       setStep('review');
       // Nettoyer l'URL
       window.history.replaceState({}, '', window.location.pathname);
-    } else if (!urlStep && step === 'type') {
-      // SI ON EST AU DÉBUT ET PAS DE RETOUR MAIL -> ON EFFACE TOUT
-      localStorage.removeItem('pending_booking');
-      setClientInfo({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        material_ref: '',
-        issue: '',
-      });
-      setPostalCode('');
-      setSelectedService(null);
-      setSelectedDate('');
-      setSelectedSlot(null);
+    } else if (!urlStep) {
+      // SI ON EST AU DÉBUT (PAS DE PARAMÈTRE DANS L'URL) -> ON NE FORCE PAS L'ÉTAPE
+      // On peut garder les données en mémoire si on veut que le client retrouve son brouillon 
+      // mais on reste à l'étape 'type'
+      setStep('type');
     }
-  }, [mounted, step]);
+  }, [mounted]); // On ne surveille plus 'step' ici pour éviter les boucles de restauration
 
   // Sauvegarde automatique à chaque changement d'étape pour ne rien perdre
   useEffect(() => {
@@ -228,10 +258,14 @@ export default function BookingWizard() {
         service: selectedService,
         date: selectedDate,
         slot: selectedSlot,
-        info: clientInfo
+        info: clientInfo,
+        categoryId: selectedCategoryId,
+        equipmentTypeId: selectedEquipmentTypeId,
+        warrantyTypeId: selectedWarrantyTypeId,
+        customQuestion: customQuestion
       }));
     }
-  }, [step, appointmentType, postalCode, selectedService, selectedDate, selectedSlot, clientInfo, mounted]);
+  }, [step, appointmentType, postalCode, selectedService, selectedDate, selectedSlot, clientInfo, selectedCategoryId, selectedEquipmentTypeId, selectedWarrantyTypeId, customQuestion, mounted]);
 
   if (!mounted) return <div className="p-12 text-center text-slate-400">Chargement de l&apos;assistant...</div>;
 
@@ -263,6 +297,11 @@ export default function BookingWizard() {
   };
 
   const createAppointment = async () => {
+    if (!selectedSlot || !selectedDate || !selectedService) {
+      setError("Informations de créneau ou de service manquantes.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -301,13 +340,19 @@ export default function BookingWizard() {
     }
   };
 
+  const formatDateFR = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   return (
     <div className="flex flex-col min-h-[500px]">
       {/* Progress Bar */}
       <div className="flex border-b border-slate-100 bg-slate-50/50">
         {[
           { id: 'type', label: 'Type', icon: MapPin },
-          { id: 'service', label: 'Service', icon: Wrench },
+          { id: 'equipment', label: 'Appareil', icon: Wrench },
           { id: 'slot', label: 'Rendez-vous', icon: Calendar },
           { id: 'info', label: 'Infos', icon: User },
           { id: 'payment', label: 'Paiement', icon: CreditCard },
@@ -339,7 +384,7 @@ export default function BookingWizard() {
                 <button
                   onClick={() => {
                     setAppointmentType('atelier');
-                    setStep('service');
+                    setStep('equipment');
                   }}
                   className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${
                     appointmentType === 'atelier' ? 'border-primary bg-blue-50/50' : 'border-slate-100 hover:border-blue-200'
@@ -401,43 +446,10 @@ export default function BookingWizard() {
                     const val = e.target.value.replace(/\D/g, '').slice(0, 5);
                     setPostalCode(val);
                     if (val.length === 5) {
-                      // On attend un tout petit peu pour laisser l'utilisateur voir son code
-                      setTimeout(() => setStep('service'), 300);
+                      setTimeout(() => setStep('equipment'), 300);
                     }
                   }}
                 />
-              </div>
-            </motion.div>
-          )}
-
-          {step === 'service' && (
-            <motion.div
-              key="service"
-              initial={{ opacity: 1, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <h2 className="text-2xl font-bold text-slate-800">Quel type de prestation ?</h2>
-              <div className="grid grid-cols-1 gap-3">
-                {services.map(service => (
-                  <button
-                    key={service.id}
-                    onClick={() => {
-                      setSelectedService(service);
-                      setStep('equipment');
-                    }}
-                    className={`p-4 rounded-xl border transition-all text-left flex justify-between items-center ${
-                      selectedService?.id === service.id ? 'border-primary bg-blue-50 text-primary ring-2 ring-primary/20' : 'border-slate-200 hover:border-primary/50'
-                    }`}
-                  >
-                    <div>
-                      <h3 className="font-bold">{service.name}</h3>
-                      <p className="text-slate-500 text-sm">{service.description}</p>
-                    </div>
-                    <span className="font-bold text-lg">{service.price}€</span>
-                  </button>
-                ))}
               </div>
             </motion.div>
           )}
@@ -450,34 +462,45 @@ export default function BookingWizard() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <h2 className="text-2xl font-bold text-slate-800">Détails de l&apos;appareil</h2>
-              
-              <div className="space-y-4">
-                {/* Catégorie */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Thème / Catégorie</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {categories.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategoryId(cat.id);
-                          setSelectedEquipmentTypeId('');
-                        }}
-                        className={`p-3 text-sm rounded-xl border font-semibold transition-all ${
-                          selectedCategoryId === cat.id ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
-                        }`}
-                      >
-                        {cat.name}
-                      </button>
-                    ))}
+              <div className="flex justify-between items-end mb-6">
+                <h2 className="text-2xl font-bold text-slate-800">Détails de l&apos;appareil</h2>
+                {selectedService && (
+                  <div className="bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm">
+                    Forfait Diagnostic : {selectedService.price}€
                   </div>
+                )}
+              </div>
+              
+              <div className="space-y-6">
+                {/* Catégorie */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <label className="block text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">1. Famille d'appareil</label>
+                  {categories.length === 0 ? (
+                    <div className="text-sm text-slate-400 italic">Chargement des catégories...</div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {categories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            setSelectedCategoryId(cat.id);
+                            setSelectedEquipmentTypeId('');
+                          }}
+                          className={`p-3 text-sm rounded-xl border font-semibold transition-all ${
+                            selectedCategoryId === cat.id ? 'bg-primary text-white border-primary shadow-md' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-primary/50'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Matériel */}
                 {selectedCategoryId && (
-                  <div className="animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Type de matériel</label>
+                  <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">2. Type exact</label>
                     <div className="grid grid-cols-2 gap-2">
                       {equipmentTypes.map(type => (
                         <button
@@ -602,9 +625,28 @@ export default function BookingWizard() {
                     </button>
                   ))
                 ) : (
-                  <p className="col-span-full text-slate-400 text-center py-8">
-                    {selectedDate ? 'Aucun créneau disponible pour cette date.' : 'Sélectionnez une date.'}
-                  </p>
+                  <div className="col-span-full p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <p className="text-slate-500 font-medium mb-3">
+                      {selectedDate 
+                        ? (appointmentType === 'domicile' 
+                            ? "Nos techniciens ne sont pas disponibles à domicile pour cette date."
+                            : "Aucun créneau n'est disponible en atelier pour cette date.")
+                        : 'Veuillez sélectionner une date pour voir les disponibilités.'}
+                    </p>
+                    {selectedDate && appointmentType === 'domicile' && (
+                      <button 
+                        onClick={() => {
+                          setAppointmentType('atelier');
+                          setStep('service');
+                          setSelectedDate('');
+                          setSelectedSlot(null);
+                        }}
+                        className="bg-white text-primary border border-primary/20 px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary hover:text-white transition-all shadow-sm"
+                      >
+                        Préférer un dépôt en magasin ?
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               
@@ -662,33 +704,13 @@ export default function BookingWizard() {
                   placeholder="Référence de l'appareil (ex: Samsung S21)"
                   className="w-full p-4 rounded-xl border border-slate-200 mb-4"
                   value={clientInfo.material_ref}
-                  onChange={e => {
-                    const newInfo = { ...clientInfo, material_ref: e.target.value };
-                    setClientInfo(newInfo);
-                    sessionStorage.setItem('pending_booking', JSON.stringify({
-                      type: appointmentType,
-                      service: selectedService,
-                      date: selectedDate,
-                      slot: selectedSlot,
-                      info: newInfo
-                    }));
-                  }}
+                  onChange={e => setClientInfo({ ...clientInfo, material_ref: e.target.value })}
                 />
                 <textarea
                   placeholder="Description de la panne"
                   className="w-full p-4 rounded-xl border border-slate-200 min-h-[100px]"
                   value={clientInfo.issue}
-                  onChange={e => {
-                    const newInfo = { ...clientInfo, issue: e.target.value };
-                    setClientInfo(newInfo);
-                    sessionStorage.setItem('pending_booking', JSON.stringify({
-                      type: appointmentType,
-                      service: selectedService,
-                      date: selectedDate,
-                      slot: selectedSlot,
-                      info: newInfo
-                    }));
-                  }}
+                  onChange={e => setClientInfo({ ...clientInfo, issue: e.target.value })}
                 />
               </div>
             </motion.div>
@@ -731,21 +753,41 @@ export default function BookingWizard() {
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Service & RDV</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 font-medium">Type :</span>
-                      <span className="font-bold capitalize">{appointmentType}</span>
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="text-slate-600 font-medium">Intervention :</span>
+                      <span className="font-bold capitalize text-primary">{appointmentType === 'domicile' ? 'À Domicile' : 'En Atelier'}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 font-medium">Prestation :</span>
-                      <span className="font-bold text-primary">{selectedService?.name}</span>
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="text-slate-600 font-medium">Catégorie :</span>
+                      <span className="font-bold">
+                        {categories.find(c => c.id === selectedCategoryId)?.name || 'Non spécifié'}
+                      </span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="text-slate-600 font-medium">Appareil :</span>
+                      <span className="font-bold">
+                        {equipmentTypes.find(t => t.id === selectedEquipmentTypeId)?.name || customQuestion || 'Non spécifié'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="text-slate-600 font-medium">Référence :</span>
+                      <span className="font-bold text-xs truncate max-w-[150px]">
+                        {clientInfo.material_ref || 'Non précisée'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="text-slate-600 font-medium">Garantie :</span>
+                      <span className="font-bold text-xs uppercase px-2 py-0.5 bg-slate-100 rounded text-slate-600">
+                        {warrantyTypes.find(w => w.id === selectedWarrantyTypeId)?.name || 'Non spécifiée'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                       <span className="text-slate-600 font-medium">Date :</span>
-                      <span className="font-bold">{selectedDate}</span>
+                      <span className="font-bold capitalize">{formatDateFR(selectedDate)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600 font-medium">Heure :</span>
-                      <span className="font-bold">{selectedSlot?.start_time.slice(0, 5)}</span>
+                      <span className="font-bold text-lg">{selectedSlot?.start_time?.slice(0, 5) || '--:--'}</span>
                     </div>
                   </div>
                 </div>
@@ -753,11 +795,20 @@ export default function BookingWizard() {
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Vos Coordonnées</h3>
                   <div className="space-y-3">
-                    <p className="text-slate-800 font-bold">{clientInfo.name}</p>
-                    <p className="text-slate-600 text-sm">{clientInfo.email}</p>
-                    <p className="text-slate-600 text-sm">{clientInfo.phone}</p>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-slate-400 uppercase font-black">Nom & Prénom</span>
+                      <p className="text-slate-800 font-bold">{clientInfo.name || 'Non renseigné'}</p>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-slate-400 uppercase font-black">Contact</span>
+                      <p className="text-slate-600 text-sm font-medium">{clientInfo.email}</p>
+                      <p className="text-slate-600 text-sm font-medium">{clientInfo.phone || 'Pas de téléphone'}</p>
+                    </div>
                     {appointmentType === 'domicile' && (
-                      <p className="text-slate-600 text-sm italic">{clientInfo.address}</p>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-400 uppercase font-black">Adresse</span>
+                        <p className="text-slate-600 text-sm italic">{clientInfo.address || 'Non renseignée'}</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -765,15 +816,15 @@ export default function BookingWizard() {
 
               <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-primary">Total à régler maintenant</h4>
-                  <p className="text-xs text-primary/60">Paiement sécurisé par Stripe</p>
+                  <h4 className="font-bold text-primary italic">Acompte de réservation</h4>
+                  <p className="text-[10px] text-primary/60 uppercase font-black">Diagnostic & Déplacement inclus</p>
                 </div>
                 <div className="text-3xl font-black text-primary">
-                  {selectedService?.price}€
+                  {selectedService?.price || 0}€
                 </div>
               </div>
 
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 italic">
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 italic text-center">
                 En cliquant sur &quot;Procéder au paiement&quot;, vous confirmez l&apos;exactitude des informations ci-dessus.
               </div>
             </motion.div>
