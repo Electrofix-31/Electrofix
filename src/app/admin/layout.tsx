@@ -83,7 +83,7 @@ export default async function AdminLayout({
           <Link href="/admin/users" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
             <Shield className="w-5 h-5" /> <span className="text-sm lg:text-base">Utilisateurs</span>
           </Link>
-          <Link href="/admin/technicians" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
+          <Link href="/admin/equipe" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
             <Users className="w-5 h-5" /> <span className="text-sm lg:text-base">Techniciens</span>
           </Link>
           <Link href="/admin/inventory" className="flex items-center gap-2 lg:gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 whitespace-nowrap">
