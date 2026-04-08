@@ -30,6 +30,10 @@ export async function POST(request: Request) {
     attachment_url,
     client_address, // Seulement pour 'domicile'
     client_phone, // Pour contact
+    equipment_type_id,
+    warranty_type_id,
+    custom_equipment_question,
+    attachment_urls
   } = await request.json();
 
   // 2. Validation des données de base
@@ -190,7 +194,11 @@ export async function POST(request: Request) {
       longitude: longitude,
       stripe_payment_intent_id: paymentIntent.id,
       payment_status: 'pending', 
-      status: 'pending', 
+      status: 'pending',
+      equipment_type_id: equipment_type_id || null,
+      warranty_type_id: warranty_type_id || null,
+      custom_equipment_question: custom_equipment_question || null,
+      attachment_urls: attachment_urls || null
     })
     .select()
     .single();

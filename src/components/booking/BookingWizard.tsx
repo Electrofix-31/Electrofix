@@ -7,7 +7,7 @@ import { Wrench, MapPin, Calendar, User, CreditCard, ChevronRight, ChevronLeft, 
 import StripeWrapper from './StripeWrapper';
 import PaymentForm from './PaymentForm';
 
-type Step = 'type' | 'postal' | 'service' | 'slot' | 'info' | 'auth' | 'review' | 'payment';
+type Step = 'type' | 'postal' | 'service' | 'equipment' | 'slot' | 'info' | 'auth' | 'review' | 'payment';
 
 export default function BookingWizard() {
   const [mounted, setMounted] = useState(false);
@@ -19,6 +19,19 @@ export default function BookingWizard() {
   const [appointmentType, setAppointmentType] = useState<'atelier' | 'domicile' | null>(null);
   const [postalCode, setPostalCode] = useState<string>('');
   const [selectedService, setSelectedService] = useState<any>(null);
+  
+  // Nouveaux états Matériel
+  const [categories, setCategories] = useState<any[]>([]);
+  const [equipmentTypes, setEquipmentTypes] = useState<any[]>([]);
+  const [warrantyTypes, setWarrantyTypes] = useState<any[]>([]);
+  
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedEquipmentTypeId, setSelectedEquipmentTypeId] = useState<string>('');
+  const [selectedWarrantyTypeId, setSelectedWarrantyTypeId] = useState<string>('');
+  const [customQuestion, setCustomQuestion] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [clientInfo, setClientInfo] = useState({
@@ -48,28 +61,31 @@ export default function BookingWizard() {
     setMounted(true);
   }, []);
 
-  // Load services when appointment type changes
+  // Load equipment data
   useEffect(() => {
-    if (appointmentType) {
-      fetch(`/api/services?type=${appointmentType}`)
-        .then(res => res.json())
-        .then(data => setServices(data))
-        .catch(err => console.error('Error fetching services:', err));
+    if (mounted) {
+      const fetchData = async () => {
+        const { data: catData } = await supabase.from('equipment_categories').select('*').order('name');
+        const { data: warData } = await supabase.from('warranty_types').select('*').order('name');
+        setCategories(catData || []);
+        setWarrantyTypes(warData || []);
+      };
+      fetchData();
     }
-  }, [appointmentType]);
+  }, [mounted]);
 
-  // Load slots when date changes
+  // Load equipment types when category changes
   useEffect(() => {
-    if (selectedDate && appointmentType) {
-      // On envoie le code postal s'il a été saisi (pour l'optimisation géo)
-      const postalCodeQuery = postalCode ? `&postal_code=${postalCode}` : '';
-
-      fetch(`/api/appointments/slots?service_type=${appointmentType}&date=${selectedDate}${postalCodeQuery}`)
-        .then(res => res.json())
-        .then(data => setSlots(data))
-        .catch(err => console.error('Error fetching slots:', err));
+    if (selectedCategoryId) {
+      const fetchTypes = async () => {
+        const { data } = await supabase.from('equipment_types').select('*').eq('category_id', selectedCategoryId).order('name');
+        setEquipmentTypes(data || []);
+      };
+      fetchTypes();
+    } else {
+      setEquipmentTypes([]);
     }
-  }, [selectedDate, appointmentType, postalCode]);
+  }, [selectedCategoryId]);
 
   const handleNext = async () => {
     if (step === 'type') {
@@ -77,7 +93,8 @@ export default function BookingWizard() {
       else setStep('service');
     }
     else if (step === 'postal' && postalCode.length === 5) setStep('service');
-    else if (step === 'service' && selectedService) setStep('slot');
+    else if (step === 'service' && selectedService) setStep('equipment');
+    else if (step === 'equipment' && (selectedEquipmentTypeId || customQuestion)) setStep('slot');
     else if (step === 'slot' && selectedSlot) setStep('info');
     else if (step === 'info') {
       await handleAuthCheck();
@@ -93,7 +110,8 @@ export default function BookingWizard() {
       if (appointmentType === 'domicile') setStep('postal');
       else setStep('type');
     }
-    else if (step === 'slot') setStep('service');
+    else if (step === 'equipment') setStep('service');
+    else if (step === 'slot') setStep('equipment');
     else if (step === 'info') setStep('slot');
     else if (step === 'auth') setStep('info');
     else if (step === 'review') setStep('info');
@@ -217,10 +235,39 @@ export default function BookingWizard() {
 
   if (!mounted) return <div className="p-12 text-center text-slate-400">Chargement de l&apos;assistant...</div>;
 
+  const uploadFiles = async () => {
+    if (files.length === 0) return [];
+    
+    setUploading(true);
+    const urls = [];
+    
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `appointments/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('appointment-attachments')
+        .upload(filePath, file);
+
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('appointment-attachments')
+          .getPublicUrl(filePath);
+        urls.push(publicUrl);
+      }
+    }
+    
+    setUploading(false);
+    return urls;
+  };
+
   const createAppointment = async () => {
     setLoading(true);
     setError(null);
     try {
+      const attachment_urls = await uploadFiles();
+
       const res = await fetch('/api/appointments/book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,6 +280,11 @@ export default function BookingWizard() {
           material_issue: clientInfo.issue,
           client_address: clientInfo.address,
           client_phone: clientInfo.phone,
+          // Nouveaux champs
+          equipment_type_id: selectedEquipmentTypeId || null,
+          warranty_type_id: selectedWarrantyTypeId || null,
+          custom_equipment_question: customQuestion || null,
+          attachment_urls: attachment_urls
         }),
       });
 
@@ -366,14 +418,14 @@ export default function BookingWizard() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <h2 className="text-2xl font-bold text-slate-800">Quel appareil pose problème ?</h2>
+              <h2 className="text-2xl font-bold text-slate-800">Quel type de prestation ?</h2>
               <div className="grid grid-cols-1 gap-3">
                 {services.map(service => (
                   <button
                     key={service.id}
                     onClick={() => {
                       setSelectedService(service);
-                      setStep('slot');
+                      setStep('equipment');
                     }}
                     className={`p-4 rounded-xl border transition-all text-left flex justify-between items-center ${
                       selectedService?.id === service.id ? 'border-primary bg-blue-50 text-primary ring-2 ring-primary/20' : 'border-slate-200 hover:border-primary/50'
@@ -386,6 +438,126 @@ export default function BookingWizard() {
                     <span className="font-bold text-lg">{service.price}€</span>
                   </button>
                 ))}
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'equipment' && (
+            <motion.div
+              key="equipment"
+              initial={{ opacity: 1, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <h2 className="text-2xl font-bold text-slate-800">Détails de l&apos;appareil</h2>
+              
+              <div className="space-y-4">
+                {/* Catégorie */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Thème / Catégorie</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {categories.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setSelectedCategoryId(cat.id);
+                          setSelectedEquipmentTypeId('');
+                        }}
+                        className={`p-3 text-sm rounded-xl border font-semibold transition-all ${
+                          selectedCategoryId === cat.id ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Matériel */}
+                {selectedCategoryId && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Type de matériel</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {equipmentTypes.map(type => (
+                        <button
+                          key={type.id}
+                          onClick={() => {
+                            setSelectedEquipmentTypeId(type.id);
+                            setCustomQuestion('');
+                          }}
+                          className={`p-3 text-sm rounded-xl border font-semibold transition-all ${
+                            selectedEquipmentTypeId === type.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'
+                          }`}
+                        >
+                          {type.name}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setSelectedEquipmentTypeId('');
+                          setCustomQuestion('Autre');
+                        }}
+                        className={`p-3 text-sm rounded-xl border font-semibold transition-all ${
+                          !selectedEquipmentTypeId && customQuestion ? 'bg-accent text-slate-900 border-accent' : 'bg-slate-50 text-slate-400 border-dashed border-slate-300'
+                        }`}
+                      >
+                        + Autre / Question
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Question libre */}
+                {(!selectedEquipmentTypeId && customQuestion) && (
+                  <div className="animate-in zoom-in-95">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Votre question ou matériel spécifique</label>
+                    <textarea
+                      placeholder="Précisez votre besoin ici..."
+                      className="w-full p-4 rounded-xl border border-slate-200 min-h-[80px] focus:ring-2 focus:ring-primary outline-none"
+                      value={customQuestion === 'Autre' ? '' : customQuestion}
+                      onChange={e => setCustomQuestion(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {/* Garantie */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">État de la garantie</label>
+                  <select 
+                    className="w-full p-4 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary"
+                    value={selectedWarrantyTypeId}
+                    onChange={e => setSelectedWarrantyTypeId(e.target.value)}
+                  >
+                    <option value="">-- Sélectionnez --</option>
+                    {warrantyTypes.map(war => (
+                      <option key={war.id} value={war.id}>{war.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Fichiers joints */}
+                <div className="pt-4 border-t border-slate-100">
+                  <label className="block text-sm font-bold text-slate-700 mb-2 italic">Photos ou documents (Max 3 Mo par fichier)</label>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,application/pdf"
+                      onChange={e => {
+                        if (e.target.files) {
+                          setFiles(Array.from(e.target.files).slice(0, 3)); // Limite à 3 fichiers
+                        }
+                      }}
+                      className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-primary hover:file:bg-blue-100 cursor-pointer"
+                    />
+                  </div>
+                  {files.length > 0 && (
+                    <div className="mt-2 text-xs text-slate-400 font-medium">
+                      {files.length} fichier(s) prêt(s) à l&apos;envoi
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
