@@ -22,10 +22,8 @@ export default function AdminAppointmentsPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    if (view === 'list') {
-      fetchAppointments();
-    }
-  }, [date, view]);
+    fetchAppointments();
+  }, [date]);
 
   const fetchAppointments = async () => {
     setLoadingList(true);
