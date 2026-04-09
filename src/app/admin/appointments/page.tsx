@@ -210,8 +210,47 @@ export default function AdminAppointmentsPage() {
                               value={app.status}
                               onChange={async (e) => {
                                 const newStatus = e.target.value;
-                                if (newStatus === 'cancelled' && !confirm("Confirmer l'annulation ? Le créneau sera libéré. Le remboursement doit être fait sur Stripe.")) return;
                                 
+                                if (newStatus === 'cancelled') {
+                                  const confirmRefund = confirm("Attention : Voulez-vous annuler cette intervention ET rembourser immédiatement le client (L'argent sera reversé sur sa carte de crédit) ?\n\nSi vous annulez sans rembourser, vous devrez le faire manuellement depuis Stripe.");
+                                  
+                                  if (!confirmRefund) {
+                                    // Si elle refuse le remboursement, on annule quand même le rdv localement
+                                    const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', app.id);
+                                    if (!error) {
+                                      setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: newStatus } : a));
+                                    }
+                                    return;
+                                  }
+
+                                  // Si elle accepte le remboursement
+                                  if (app.stripe_payment_intent_id) {
+                                     // Afficher un état de chargement visuel serait idéal ici, mais on fait au plus simple avec des alertes pour l'instant
+                                     try {
+                                       const res = await fetch('/api/admin/appointments/refund', {
+                                         method: 'POST',
+                                         headers: { 'Content-Type': 'application/json' },
+                                         body: JSON.stringify({ appointmentId: app.id })
+                                       });
+                                       
+                                       const result = await res.json();
+                                       
+                                       if (res.ok) {
+                                         alert('Annulation et remboursement confirmés avec succès !');
+                                         setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: 'cancelled', payment_status: 'refunded' } : a));
+                                       } else {
+                                         alert(`Erreur lors du remboursement: ${result.error}`);
+                                       }
+                                     } catch (err) {
+                                       alert('Erreur réseau lors de la demande de remboursement.');
+                                     }
+                                  } else {
+                                    alert('Aucun paiement Stripe associé à ce rendez-vous.');
+                                  }
+                                  return;
+                                }
+                                
+                                // Changement de statut standard (non-annulé)
                                 const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', app.id);
                                 if (!error) {
                                   setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: newStatus } : a));
@@ -224,7 +263,8 @@ export default function AdminAppointmentsPage() {
                                 ${app.status === 'pending' ? 'bg-blue-100 text-blue-700' : ''}
                                 ${app.status === 'confirmed' ? 'bg-green-100 text-green-700' : ''}
                                 ${app.status === 'completed' ? 'bg-slate-200 text-slate-700' : ''}
-                                ${app.status === 'cancelled' ? 'bg-red-100 text-red-700' : ''}
+                                ${app.status === 'cancelled' && app.payment_status !== 'refunded' ? 'bg-red-100 text-red-700' : ''}
+                                ${app.payment_status === 'refunded' ? 'bg-purple-100 text-purple-700' : ''}
                               `}
                             >
                               <option value="pending_payment">Attente Paiement</option>

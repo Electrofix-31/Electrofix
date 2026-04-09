@@ -53,6 +53,32 @@ Une solution de réservation "End-to-End" professionnelle. Le client est rassur�
 
 ---
 
+## [09/04/2026] - Intelligence Cartographique & Automatisation des Remboursements
+
+### Problématique
+La carte d'administration n'était pas assez dynamique pour un suivi en temps réel (marqueurs indifférenciés, position approximative). De plus, la gestion des annulations nécessitait de manipuler manuellement Stripe pour rembourser les acomptes, ce qui cassait la philosophie "No-Code" de l'application.
+
+### Analyse & Logique
+*   **Ergonomie du Direct** : La gérante doit savoir en un coup d'œil où se trouve le technicien à l'instant T.
+*   **Précision Opérationnelle** : La carte doit afficher le type de panne (ex: "Lave-linge - Fuite") et non un forfait générique pour avoir une vue d'ensemble utile.
+*   **Sécurité et Trésorerie** : Bien qu'une "empreinte bancaire" (pré-autorisation) évite les frais d'annulation, sa limite légale de 7 jours est incompatible avec les plannings d'été. Il faut conserver le prélèvement immédiat tout en simplifiant le remboursement.
+
+### Décision / Solution
+1.  **Géo-Localisation Réelle** : Mise à jour des coordonnées du magasin (Point Central) vers sa véritable adresse (3 Av. Jean Monnet, Carbonne).
+2.  **Carte Intelligente ("Live Map")** :
+    *   Algorithme calculant l'intervention "En Cours" (fenêtre glissante de 60 min) ou "Prochaine".
+    *   Marquage visuel dynamique : L'intervention cible s'affiche en rouge et s'ouvre automatiquement au chargement de la page avec un badge d'état.
+3.  **Sur-couche de Données** : Modification de l'API de la carte pour inclure les familles, types d'appareils et motifs de pannes déclarés par le client dans la bulle d'information.
+4.  **Remboursement API "1-Click"** :
+    *   Création d'un endpoint backend sécurisé communiquant avec l'API Stripe.
+    *   Lorsqu'un rendez-vous est passé en "Annulé" dans l'Admin, l'interface propose un remboursement intégral en 1 clic.
+    *   Mise à jour automatique du statut de paiement en "Remboursé" (pastille violette) en base de données.
+
+### Résultat
+La carte est devenue un véritable outil de pilotage logistique en temps réel. La charge mentale administrative est réduite à néant pour la gestion des litiges/annulations, tout est centralisé dans le tableau de bord ElectroFix.
+
+---
+
 ## [06/04/2026] - Standardisation ES Modules (ESM)
 
 ### Problématique
