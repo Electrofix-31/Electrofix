@@ -321,6 +321,7 @@ export default function BookingWizard() {
           material_ref: clientInfo.material_ref,
           material_issue: clientInfo.issue,
           client_address: `${clientInfo.addressLine1}${clientInfo.addressLine2 ? ', ' + clientInfo.addressLine2 : ''}, ${postalCode} ${clientInfo.city}`,
+          geocoding_address: `${clientInfo.addressLine1}, ${postalCode} ${clientInfo.city}`,
           access_instructions: clientInfo.access_instructions,
           client_phone: clientInfo.phone,
           // Nouveaux champs

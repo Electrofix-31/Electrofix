@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     purchase_info,
     attachment_url,
     client_address, // Seulement pour 'domicile'
+    geocoding_address, // L'adresse purifiée (sans ligne 2) pour la recherche GPS
     access_instructions, // NOUVEAU CHAMP
     client_phone, // Pour contact
     equipment_type_id,
@@ -63,8 +64,10 @@ export async function POST(request: Request) {
   // 2.5 Géocodage de l'adresse (seulement si domicile)
   let latitude = null;
   let longitude = null;
-  if (appointment_type === 'domicile' && client_address) {
-    const coords = await geocodeAddress(client_address);
+  // On utilise l'adresse purifiée si elle existe, sinon l'adresse complète
+  const addressToGeocode = geocoding_address || client_address; 
+  if (appointment_type === 'domicile' && addressToGeocode) {
+    const coords = await geocodeAddress(addressToGeocode);
     if (coords) {
       latitude = coords.lat;
       longitude = coords.lon;
