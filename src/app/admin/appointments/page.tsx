@@ -19,11 +19,20 @@ export default function AdminAppointmentsPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [cancelDialog, setCancelDialog] = useState<{isOpen: boolean, appId: string | null} | null>(null);
+  const [maxRadius, setMaxRadius] = useState<number>(20);
   const supabase = createClient();
 
   useEffect(() => {
     fetchAppointments();
+    fetchSettings();
   }, [date]);
+
+  const fetchSettings = async () => {
+    const { data } = await supabase.from('admin_settings').select('value').eq('key', 'max_intervention_radius').single();
+    if (data?.value?.value) {
+      setMaxRadius(data.value.value);
+    }
+  };
 
   const fetchAppointments = async () => {
     setLoadingList(true);
@@ -152,7 +161,7 @@ export default function AdminAppointmentsPage() {
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
                 <Map className="w-5 h-5 text-accent" /> 
-                Répartition Géographique (Rayon 30km)
+                Répartition Géographique (Rayon {maxRadius}km)
               </h2>
               <MapAdmin date={date} />
             </div>
@@ -170,7 +179,7 @@ export default function AdminAppointmentsPage() {
                </div>
                <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl">
                   <p className="text-orange-600 text-xs font-bold uppercase tracking-widest mb-1">Zone Rayon</p>
-                  <p className="text-xl font-black text-slate-900">30 km</p>
+                  <p className="text-xl font-black text-slate-900">{maxRadius} km</p>
                   <p className="text-sm text-slate-500 mt-2">Limitation automatique active</p>
                </div>
             </div>
