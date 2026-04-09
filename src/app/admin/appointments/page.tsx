@@ -45,7 +45,7 @@ export default function AdminAppointmentsPage() {
     setLoadingList(false);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, payment_status?: string) => {
     const statusMap: any = {
       pending_payment: { color: 'bg-amber-100 text-amber-700', label: 'Attente Paiement' },
       pending: { color: 'bg-blue-100 text-blue-700', label: 'À Confirmer' },
@@ -53,8 +53,16 @@ export default function AdminAppointmentsPage() {
       completed: { color: 'bg-slate-200 text-slate-700', label: 'Terminé' },
       cancelled: { color: 'bg-red-100 text-red-700', label: 'Annulé' },
     };
-    const s = statusMap[status] || { color: 'bg-slate-100 text-slate-700', label: status };
-    return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${s.color}`}>{s.label}</span>;
+
+    let label = statusMap[status]?.label || status;
+    let color = statusMap[status]?.color || 'bg-slate-100 text-slate-700';
+
+    if (status === 'cancelled' && payment_status === 'refunded') {
+      label = 'Annulé & Remboursé';
+      color = 'bg-purple-100 text-purple-700';
+    }
+
+    return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${color}`}>{label}</span>;
   };
 
   return (
@@ -208,6 +216,7 @@ export default function AdminAppointmentsPage() {
                           <div className="flex flex-col items-start gap-2">
                             <select
                               value={app.status}
+                              disabled={app.payment_status === 'refunded'}
                               onChange={async (e) => {
                                 const newStatus = e.target.value;
                                 
@@ -225,7 +234,6 @@ export default function AdminAppointmentsPage() {
 
                                   // Si elle accepte le remboursement
                                   if (app.stripe_payment_intent_id) {
-                                     // Afficher un état de chargement visuel serait idéal ici, mais on fait au plus simple avec des alertes pour l'instant
                                      try {
                                        const res = await fetch('/api/admin/appointments/refund', {
                                          method: 'POST',
@@ -258,7 +266,7 @@ export default function AdminAppointmentsPage() {
                                   alert("Erreur lors de la mise à jour du statut.");
                                 }
                               }}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer border-none appearance-none pr-6 bg-no-repeat bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%2020%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[position:right_4px_center] bg-[length:12px]
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer border-none appearance-none pr-6 bg-no-repeat bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%2020%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[position:right_4px_center] bg-[length:12px] disabled:opacity-50 disabled:cursor-not-allowed
                                 ${app.status === 'pending_payment' ? 'bg-amber-100 text-amber-700' : ''}
                                 ${app.status === 'pending' ? 'bg-blue-100 text-blue-700' : ''}
                                 ${app.status === 'confirmed' ? 'bg-green-100 text-green-700' : ''}
@@ -271,7 +279,7 @@ export default function AdminAppointmentsPage() {
                               <option value="pending">À Confirmer</option>
                               <option value="confirmed">Confirmé</option>
                               <option value="completed">Terminé</option>
-                              <option value="cancelled">Annulé</option>
+                              <option value="cancelled">{app.payment_status === 'refunded' ? 'Annulé & Remboursé' : 'Annulé'}</option>
                             </select>
                             <span className="font-black text-slate-900">{app.services?.price}€</span>
                             <span className="text-[10px] text-slate-400">{app.services?.name}</span>
