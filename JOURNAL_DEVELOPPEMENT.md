@@ -41,9 +41,12 @@ Le parcours de réservation initial ("Choix de prestation") manquait de précisi
 2.  **Paramètres Admin** : Ajout d'une interface complète (`/admin/settings`) pour que la gérante modifie les familles, les appareils, les prix des forfaits, et le rayon d'intervention maximal.
 3.  **Refonte du BookingWizard** : Intégration du choix d'appareil, ajout de l'upload de 3 fichiers (vers Supabase Storage), et modification de l'étape "Review" pour un récapitulatif ultra-précis.
 4.  **Moteur API `slots`** : Suppression du blocage RH strict pour le terrain (remplacé par une alerte visuelle) et implémentation de l'algorithme de distance séquentielle.
+5.  **Logistique Rurale** : Ajout d'un champ "Instructions d'accès" (codes, chemins, chiens) sauvegardé en BDD et transmis au technicien.
+6.  **Automatisation** : Envoi d'un email de confirmation HTML (via Resend) déclenché dès la validation du paiement Stripe, même sans rechargement de page.
+7.  **Gestion des Annulations** : Mise en place d'un sélecteur de statut interactif dans l'Admin permettant de libérer instantanément un créneau horaire en passant en "Annulé".
 
 ### Résultat
-Une prise de rendez-vous digne d'un grand réseau national. Le client fournit un dossier complet (photos, garantie) et l'algorithme garantit que le technicien ne fera jamais de détours absurdes.
+Une solution de réservation "End-to-End" professionnelle. Le client est rassuré par un récapitulatif et un email précis, le technicien est guidé jusqu'au portail, et la gérante pilote son planning et ses tarifs sans aucune connaissance technique.
 
 ---
 

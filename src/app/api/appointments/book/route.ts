@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     purchase_info,
     attachment_url,
     client_address, // Seulement pour 'domicile'
+    access_instructions, // NOUVEAU CHAMP
     client_phone, // Pour contact
     equipment_type_id,
     warranty_type_id,
@@ -189,6 +190,7 @@ export async function POST(request: Request) {
       attachment_url: attachment_url,
       client_postal_code: postalCode,
       client_address: client_address,
+      access_instructions: access_instructions || null,
       client_phone: client_phone,
       latitude: latitude,
       longitude: longitude,

@@ -206,7 +206,33 @@ export default function AdminAppointmentsPage() {
                         {/* STATUT */}
                         <td className="px-6 py-4 align-top">
                           <div className="flex flex-col items-start gap-2">
-                            {getStatusBadge(app.status)}
+                            <select
+                              value={app.status}
+                              onChange={async (e) => {
+                                const newStatus = e.target.value;
+                                if (newStatus === 'cancelled' && !confirm("Confirmer l'annulation ? Le créneau sera libéré. Le remboursement doit être fait sur Stripe.")) return;
+                                
+                                const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', app.id);
+                                if (!error) {
+                                  setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: newStatus } : a));
+                                } else {
+                                  alert("Erreur lors de la mise à jour du statut.");
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer border-none appearance-none pr-6 bg-no-repeat bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%2020%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[position:right_4px_center] bg-[length:12px]
+                                ${app.status === 'pending_payment' ? 'bg-amber-100 text-amber-700' : ''}
+                                ${app.status === 'pending' ? 'bg-blue-100 text-blue-700' : ''}
+                                ${app.status === 'confirmed' ? 'bg-green-100 text-green-700' : ''}
+                                ${app.status === 'completed' ? 'bg-slate-200 text-slate-700' : ''}
+                                ${app.status === 'cancelled' ? 'bg-red-100 text-red-700' : ''}
+                              `}
+                            >
+                              <option value="pending_payment">Attente Paiement</option>
+                              <option value="pending">À Confirmer</option>
+                              <option value="confirmed">Confirmé</option>
+                              <option value="completed">Terminé</option>
+                              <option value="cancelled">Annulé</option>
+                            </select>
                             <span className="font-black text-slate-900">{app.services?.price}€</span>
                             <span className="text-[10px] text-slate-400">{app.services?.name}</span>
                           </div>

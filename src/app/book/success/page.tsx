@@ -15,6 +15,22 @@ function SuccessContent() {
     if (appointmentId) {
       // Vider la mémoire de réservation après un succès
       localStorage.removeItem('pending_booking');
+      
+      // Envoi de l'email de confirmation (avec une vérification pour éviter les doubles envois en mode dev StrictMode)
+      const hasSentEmail = sessionStorage.getItem(`email_sent_${appointmentId}`);
+      if (!hasSentEmail) {
+        fetch('/api/appointments/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointment_id: appointmentId })
+        }).then(res => {
+          if (res.ok) {
+            sessionStorage.setItem(`email_sent_${appointmentId}`, 'true');
+            console.log("Email de confirmation envoyé au client.");
+          }
+        }).catch(err => console.error("Erreur d'envoi d'email:", err));
+      }
+
       setLoading(false);
     }
   }, [appointmentId]);

@@ -51,7 +51,8 @@ export async function GET(request: Request) {
   const finalSlots = (availableSlots || []).map(slot => {
     const timeStr = slot.start_time;
 
-    const fieldAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'domicile') || [];
+    // CORRECTION : On compte bien le nombre d'éléments (length) et non le tableau lui-même
+    const fieldAppsCount = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'domicile').length || 0;
     const storeAppsAtTime = bookedAppointments?.filter(a => a.time === timeStr && a.appointment_type === 'atelier').length || 0;
 
     let isAvailable = false;
@@ -60,8 +61,8 @@ export async function GET(request: Request) {
     if (service_type === 'atelier') {
       isAvailable = storeAppsAtTime < slot.max_capacity_store;
     } else {
-      // DOMICILE : Règle 1 : Zone globale & Créneau libre
-      isAvailable = !isOutsideStoreZone && fieldAppsAtTime.length < 1;
+      // DOMICILE : Règle 1 : Zone globale & Créneau libre (Tournée unique)
+      isAvailable = !isOutsideStoreZone && fieldAppsCount < 1;
 
       // DOMICILE : Règle 2 : Proximité Séquentielle (Anti-Zigzag)
       if (isAvailable && clientCoords) {
@@ -78,9 +79,12 @@ export async function GET(request: Request) {
 
           if (isAdjacent) {
             const distanceToAdjacent = calculateDistance(clientCoords.lat, clientCoords.lon, app.latitude, app.longitude);
+            console.log(`[DEBUG SLOTS] Distance entre ${postal_code} et ${app.client_postal_code}: ${distanceToAdjacent.toFixed(2)}km`);
+            
             if (distanceToAdjacent > MAX_SEQUENTIAL_DISTANCE) {
-              isAvailable = false; // Trop loin du RDV précédent/suivant pour ce créneau !
-              break; // Inutile de vérifier les autres
+              console.log(`[DEBUG SLOTS] Bloqué: ${distanceToAdjacent.toFixed(2)}km > ${MAX_SEQUENTIAL_DISTANCE}km`);
+              isAvailable = false; 
+              break; 
             }
           }
         }

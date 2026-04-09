@@ -35,6 +35,17 @@ export default function PaymentForm({ clientSecret, appointmentId }: { clientSec
       }
       setIsLoading(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      // 1. Vider le panier
+      localStorage.removeItem('pending_booking');
+      
+      // 2. Envoyer l'email de confirmation silencieusement
+      fetch('/api/appointments/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment_id: appointmentId })
+      }).catch(err => console.error("Erreur d'envoi d'email en arrière-plan :", err));
+
+      // 3. Afficher le succès
       setIsSuccess(true);
       setIsLoading(false);
     }

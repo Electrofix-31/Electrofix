@@ -39,6 +39,7 @@ export default function BookingWizard() {
     email: '',
     phone: '',
     address: '',
+    access_instructions: '',
     material_ref: '',
     issue: '',
   });
@@ -318,6 +319,7 @@ export default function BookingWizard() {
           material_ref: clientInfo.material_ref,
           material_issue: clientInfo.issue,
           client_address: clientInfo.address,
+          access_instructions: clientInfo.access_instructions,
           client_phone: clientInfo.phone,
           // Nouveaux champs
           equipment_type_id: selectedEquipmentTypeId || null,
@@ -691,12 +693,25 @@ export default function BookingWizard() {
                 onChange={e => setClientInfo({ ...clientInfo, email: e.target.value })}
               />
               {appointmentType === 'domicile' && (
-                <input
-                  placeholder="Adresse d'intervention"
-                  className="w-full p-4 rounded-xl border border-slate-200"
-                  value={clientInfo.address}
-                  onChange={e => setClientInfo({ ...clientInfo, address: e.target.value })}
-                />
+                <div className="space-y-4">
+                  <input
+                    placeholder="Adresse d'intervention complète"
+                    className="w-full p-4 rounded-xl border border-slate-200"
+                    value={clientInfo.address}
+                    onChange={e => setClientInfo({ ...clientInfo, address: e.target.value })}
+                  />
+                  <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100/50">
+                    <label className="block text-xs font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <MapPin className="w-4 h-4" /> Instructions d'accès (Optionnel)
+                    </label>
+                    <textarea
+                      placeholder="Code portail, nom sur l'interphone, indication routière, chien méchant..."
+                      className="w-full p-4 rounded-xl border border-amber-200 bg-white min-h-[80px] text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
+                      value={clientInfo.access_instructions}
+                      onChange={e => setClientInfo({ ...clientInfo, access_instructions: e.target.value })}
+                    />
+                  </div>
+                </div>
               )}
               <div className="pt-4 border-t border-slate-100">
                 <h3 className="font-bold mb-3">Détails de l&apos;appareil</h3>
@@ -808,6 +823,14 @@ export default function BookingWizard() {
                       <div className="flex flex-col">
                         <span className="text-[10px] text-slate-400 uppercase font-black">Adresse</span>
                         <p className="text-slate-600 text-sm italic">{clientInfo.address || 'Non renseignée'}</p>
+                      </div>
+                    )}
+                    {appointmentType === 'domicile' && clientInfo.access_instructions && (
+                      <div className="flex flex-col mt-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                        <span className="text-[10px] text-amber-600 uppercase font-black flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> Instructions d'accès
+                        </span>
+                        <p className="text-amber-800 text-xs mt-1">{clientInfo.access_instructions}</p>
                       </div>
                     )}
                   </div>
