@@ -48,6 +48,9 @@ Le parcours de réservation initial ("Choix de prestation") manquait de précisi
 ### Résultat
 Une solution de réservation "End-to-End" professionnelle. Le client est rassuré par un récapitulatif et un email précis, le technicien est guidé jusqu'au portail, et la gérante pilote son planning et ses tarifs sans aucune connaissance technique.
 
+### Note de Suivi Technique (Facturation API)
+*   **Compte Google API (Gemini/Cloud)** : Le développement et la facturation de l'API Gemini pour ce projet sont gérés via le compte `amiraljp.fr@gmail.com`.
+
 ---
 
 ## [06/04/2026] - Standardisation ES Modules (ESM)
