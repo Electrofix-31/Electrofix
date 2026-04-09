@@ -18,6 +18,7 @@ export default function AdminAppointmentsPage() {
   // États pour la liste
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  const [cancelDialog, setCancelDialog] = useState<{isOpen: boolean, appId: string | null} | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -38,11 +39,57 @@ export default function AdminAppointmentsPage() {
         warranty_types(name)
       `)
       .eq('date', date)
-      .order('time', { ascending: true });
+      .order('start_time', { ascending: true });
 
     if (error) console.error("Erreur de récupération des RDV:", error);
     else setAppointments(data || []);
     setLoadingList(false);
+  };
+
+  const handleCancelAction = async (action: 'refund' | 'no_refund' | 'abort') => {
+    if (!cancelDialog?.appId || action === 'abort') {
+      setCancelDialog(null);
+      return;
+    }
+
+    const appId = cancelDialog.appId;
+    const app = appointments.find(a => a.id === appId);
+    if (!app) return;
+
+    // On ferme la modale pour éviter les doubles clics
+    setCancelDialog(null);
+
+    if (action === 'refund') {
+      if (app.stripe_payment_intent_id) {
+         try {
+           const res = await fetch('/api/admin/appointments/refund', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ appointmentId: app.id })
+           });
+
+           const result = await res.json();
+
+           if (res.ok) {
+             alert('Annulation et remboursement confirmés avec succès !');
+             setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: 'cancelled', payment_status: 'refunded' } : a));
+           } else {
+             alert(`Erreur lors du remboursement: ${result.error}`);
+           }
+         } catch (err) {
+           alert('Erreur réseau lors de la demande de remboursement.');
+         }
+      } else {
+        alert('Aucun paiement Stripe associé à ce rendez-vous.');
+      }
+    } else if (action === 'no_refund') {
+      const { error } = await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', app.id);
+      if (!error) {
+        setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: 'cancelled' } : a));
+      } else {
+        alert("Erreur lors de l'annulation.");
+      }
+    }
   };
 
   const getStatusBadge = (status: string, payment_status?: string) => {
@@ -221,40 +268,7 @@ export default function AdminAppointmentsPage() {
                                 const newStatus = e.target.value;
                                 
                                 if (newStatus === 'cancelled') {
-                                  const confirmRefund = confirm("Attention : Voulez-vous annuler cette intervention ET rembourser immédiatement le client (L'argent sera reversé sur sa carte de crédit) ?\n\nSi vous annulez sans rembourser, vous devrez le faire manuellement depuis Stripe.");
-                                  
-                                  if (!confirmRefund) {
-                                    // Si elle refuse le remboursement, on annule quand même le rdv localement
-                                    const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', app.id);
-                                    if (!error) {
-                                      setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: newStatus } : a));
-                                    }
-                                    return;
-                                  }
-
-                                  // Si elle accepte le remboursement
-                                  if (app.stripe_payment_intent_id) {
-                                     try {
-                                       const res = await fetch('/api/admin/appointments/refund', {
-                                         method: 'POST',
-                                         headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({ appointmentId: app.id })
-                                       });
-                                       
-                                       const result = await res.json();
-                                       
-                                       if (res.ok) {
-                                         alert('Annulation et remboursement confirmés avec succès !');
-                                         setAppointments(appointments.map(a => a.id === app.id ? { ...a, status: 'cancelled', payment_status: 'refunded' } : a));
-                                       } else {
-                                         alert(`Erreur lors du remboursement: ${result.error}`);
-                                       }
-                                     } catch (err) {
-                                       alert('Erreur réseau lors de la demande de remboursement.');
-                                     }
-                                  } else {
-                                    alert('Aucun paiement Stripe associé à ce rendez-vous.');
-                                  }
+                                  setCancelDialog({ isOpen: true, appId: app.id });
                                   return;
                                 }
                                 
@@ -315,6 +329,52 @@ export default function AdminAppointmentsPage() {
           </div>
         )}
       </div>
+
+      {/* Modale d'Annulation */}
+      {cancelDialog?.isOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in"
+          onKeyDown={(e) => { if (e.key === 'Escape') handleCancelAction('abort'); }}
+          tabIndex={-1}
+          autoFocus // Permet de capturer les événements clavier immédiatement
+        >
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-6">
+            <div>
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <XCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Confirmer l'annulation</h3>
+              <p className="text-sm text-slate-500">
+                Vous êtes sur le point d'annuler ce rendez-vous. Souhaitez-vous également rembourser instantanément l'acompte sur la carte de crédit du client ?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => handleCancelAction('refund')}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+              >
+                Oui, Annuler ET Rembourser
+              </button>
+              
+              <button 
+                onClick={() => handleCancelAction('no_refund')}
+                className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 px-4 rounded-xl transition-all border border-red-100"
+              >
+                Annuler SANS rembourser
+              </button>
+              
+              <button 
+                onClick={() => handleCancelAction('abort')}
+                className="w-full bg-white hover:bg-slate-50 text-slate-600 font-bold py-3 px-4 rounded-xl transition-all border border-slate-200 mt-2"
+              >
+                Retour (Touche Échap)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
