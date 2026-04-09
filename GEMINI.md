@@ -26,3 +26,9 @@ Ce document contient les instructions prioritaires et immuables pour le dévelop
 3. **RÈGLE RH** : Minimum 3 personnes au magasin (sauf dérogation).
 4. **IA ADMINISTRATIVE** : Triage d'emails et conseils via Gemini API.
 5. **DASHBOARD TRÉSORERIE** : Pilotage des flux (Entrées/Sorties/Records).
+
+## 6. Contexte Relationnel et Client
+- La cliente s'appelle **Anne** (c'est la fille d'un ami du développeur).
+- Le développement est effectué **bénévolement** (seuls les frais tiers sont à sa charge).
+- Les échanges avec elle se font de manière **informelle et bienveillante (tutoiement de rigueur)**.
+- L'objectif principal est de concevoir un outil qui la soulage au maximum de la charge mentale logistique et administrative liée au démarrage de son entreprise.
