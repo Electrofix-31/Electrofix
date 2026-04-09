@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, Navigation, MapPin, User, Wrench, Phone, Clock } from 'lucide-react';
@@ -35,9 +35,10 @@ const SHOP_COORDS: [number, number] = [43.3090742, 1.2198470];
 
 interface MapAdminProps {
   date: string;
+  maxRadius?: number;
 }
 
-export default function MapAdmin({ date }: MapAdminProps) {
+export default function MapAdmin({ date, maxRadius = 20 }: MapAdminProps) {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [targetAppId, setTargetAppId] = useState<string | null>(null);
@@ -135,6 +136,19 @@ export default function MapAdmin({ date }: MapAdminProps) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
+        {/* Zone d'intervention dynamique */}
+        <Circle 
+          center={SHOP_COORDS} 
+          radius={maxRadius * 1000} 
+          pathOptions={{ 
+            color: '#3b82f6', 
+            fillColor: '#3b82f6', 
+            fillOpacity: 0.05, 
+            dashArray: '5, 10', 
+            weight: 2 
+          }} 
+        />
+
         {/* Magasin */}
         <Marker position={SHOP_COORDS} icon={ShopIcon}>
           <Popup>

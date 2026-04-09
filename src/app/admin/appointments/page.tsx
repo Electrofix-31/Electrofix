@@ -163,7 +163,7 @@ export default function AdminAppointmentsPage() {
                 <Map className="w-5 h-5 text-accent" /> 
                 Répartition Géographique (Rayon {maxRadius}km)
               </h2>
-              <MapAdmin date={date} />
+              <MapAdmin date={date} maxRadius={maxRadius} />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
