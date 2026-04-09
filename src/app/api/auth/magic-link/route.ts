@@ -29,24 +29,53 @@ export async function POST(request: Request) {
     let linkData;
     let linkType: 'invite' | 'magiclink' = 'invite';
 
+    // Extraction du prénom et du nom
+    const [firstName, ...lastNameParts] = (name || '').split(' ');
+    const lastName = lastNameParts.join(' ');
+
+    const userMetadata = {
+      first_name: firstName || null,
+      last_name: lastName || null,
+      phone: phone || null
+    };
+
     try {
+      // Tentative d'invitation (Nouvel utilisateur) avec injection des métadonnées
       const { data, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'invite',
-        email: email
+        email: email,
+        options: {
+          data: userMetadata
+        }
       });
 
       if (inviteError && (inviteError.status === 422 || inviteError.message.includes('already'))) {
         linkType = 'magiclink';
+        // L'utilisateur existe déjà. On génère le lien magique.
         const { data: magicData, error: magicError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
           email: email
         });
+        
         if (magicError) throw magicError;
         linkData = magicData;
+
+        // Mise à jour explicite du profil existant (si le client veut corriger son nom/téléphone)
+        const { data: userObj } = await supabaseAdmin.auth.admin.getUserById(magicData.user.id);
+        if (userObj?.user) {
+          await supabaseAdmin.from('profiles').update(userMetadata).eq('id', userObj.user.id);
+        }
+
       } else if (inviteError) {
         throw inviteError;
       } else {
         linkData = data;
+        
+        // Pour une invitation réussie (nouvel user), la table profile est remplie par le trigger SQL habituel,
+        // mais pour être absolument certain qu'il y a un prénom/nom avant la validation, on force l'update.
+        if (data?.user?.id) {
+           await supabaseAdmin.from('profiles').upsert({ id: data.user.id, email: email, ...userMetadata });
+        }
       }
     } catch (err: any) {
       console.error('Generation Error:', err);
