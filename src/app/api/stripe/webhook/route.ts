@@ -1,6 +1,6 @@
 // src/app/api/stripe/webhook/route.ts
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // Utiliser le client standard pour injecter la clé secrète
 import Stripe from 'stripe';
 
 // Initialiser Stripe
@@ -11,8 +11,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 // IMPORTANT: La signature du webhook est essentielle pour la sécurité
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+// Créer un client Supabase avec les droits d'administration (Bypass RLS)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // Clé secrète qui contourne la RLS
+);
+
 export async function POST(req: Request) {
-  const supabase = await createClient();
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
 
@@ -43,7 +48,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing payment intent ID' }, { status: 400 });
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('appointments')
         .update({ status: 'confirmed', payment_status: 'paid' })
         .eq('stripe_payment_intent_id', paymentIntentSucceeded.id)
@@ -69,7 +74,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from('appointments')
         .update({ payment_status: 'failed', status: 'pending' }) // Ou un statut spécifique 'payment_failed'
         .eq('stripe_payment_intent_id', paymentIntentFailed.id);
