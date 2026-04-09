@@ -639,7 +639,7 @@ export default function BookingWizard() {
                       <button 
                         onClick={() => {
                           setAppointmentType('atelier');
-                          setStep('service');
+                          setStep('equipment');
                           setSelectedDate('');
                           setSelectedSlot(null);
                         }}
@@ -904,7 +904,7 @@ export default function BookingWizard() {
               loading ||
               (step === 'type' && !appointmentType) ||
               (step === 'postal' && postalCode.length < 5) ||
-              (step === 'service' && !selectedService) ||
+              (step === 'equipment' && (!selectedEquipmentTypeId && !customQuestion)) ||
               (step === 'slot' && (!selectedSlot || !selectedDate)) ||
               (step === 'info' && (!clientInfo.email || !clientInfo.name))
             }
