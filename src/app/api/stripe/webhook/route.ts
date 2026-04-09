@@ -33,19 +33,20 @@ export async function POST(req: Request) {
       console.log(`PaymentIntent for ${paymentIntentSucceeded.amount} was successful!`);
 
       // Mettre à jour le statut du rendez-vous dans Supabase
-      const { client_id, service_id, appointment_date, appointment_time } = paymentIntentSucceeded.metadata;
+      // On récupère les metadata mais on ne bloque pas si elles sont incomplètes, 
+      // car le paymentIntent ID est le lien principal et suffisant.
+      const metadata = paymentIntentSucceeded.metadata || {};
 
-      if (!paymentIntentSucceeded.id || !client_id)
+      if (!paymentIntentSucceeded.id)
 {
-        console.error('Missing paymentIntent ID or client_id in metadata');
-        return NextResponse.json({ error: 'Missing required data in metadata' }, { status: 400 });
+        console.error('Missing paymentIntent ID');
+        return NextResponse.json({ error: 'Missing payment intent ID' }, { status: 400 });
       }
 
       const { data, error } = await supabase
         .from('appointments')
         .update({ status: 'confirmed', payment_status: 'paid' })
         .eq('stripe_payment_intent_id', paymentIntentSucceeded.id)
-        .eq('client_id', client_id) // Pour plus de sécurité
         .select();
 
       if (error)
@@ -62,20 +63,16 @@ export async function POST(req: Request) {
       const paymentIntentFailed = event.data.object as Stripe.PaymentIntent;
       console.warn(`PaymentIntent for ${paymentIntentFailed.amount} failed!`);
 
-      // Mettre à jour le statut du rendez-vous à 'failed'
-      const { client_id: failedClientId } = paymentIntentFailed.metadata;
-
-      if (!paymentIntentFailed.id || !failedClientId)
+      if (!paymentIntentFailed.id)
 {
-        console.error('Missing paymentIntent ID or client_id in metadata for failed payment');
-        return NextResponse.json({ error: 'Missing required data in metadata for failed payment' }, { status: 400 });
+        console.error('Missing paymentIntent ID for failed payment');
+        return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
       }
 
       const { error: updateError } = await supabase
         .from('appointments')
         .update({ payment_status: 'failed', status: 'pending' }) // Ou un statut spécifique 'payment_failed'
-        .eq('stripe_payment_intent_id', paymentIntentFailed.id)
-        .eq('client_id', failedClientId);
+        .eq('stripe_payment_intent_id', paymentIntentFailed.id);
 
       if (updateError)
 {
