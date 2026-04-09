@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const maxRadius = radiusSetting?.value?.value ?? 20;
 
   // 2. Point central : Carbonne (31390)
-  const STORE_COORDS = { lat: 43.2974, lon: 1.2268 }; // Coordonnées approximatives de Carbonne centre
+  const STORE_COORDS = { lat: 43.3090742, lon: 1.2198470 }; // Emplacement réel : 3 Av. Jean Monnet, Carbonne
 
   // 3. Récupérer les créneaux configurés
   const { data: availableSlots } = await supabase

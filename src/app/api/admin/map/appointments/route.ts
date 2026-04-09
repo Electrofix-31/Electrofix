@@ -23,7 +23,13 @@ export async function GET(request: Request) {
       latitude,
       longitude,
       services (name, price),
-      profiles (first_name, last_name)
+      profiles (first_name, last_name),
+      equipment_types (
+        name,
+        equipment_categories (
+          name
+        )
+      )
     `)
     .eq('date', date)
     .eq('appointment_type', 'domicile')
