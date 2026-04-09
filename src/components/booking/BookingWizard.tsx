@@ -38,10 +38,12 @@ export default function BookingWizard() {
     name: '',
     email: '',
     phone: '',
-    address: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
     access_instructions: '',
     material_ref: '',
-    issue: '',
+    issue: ''
   });
 
   // Auth State (Magic Link)
@@ -318,7 +320,7 @@ export default function BookingWizard() {
           time: selectedSlot.start_time,
           material_ref: clientInfo.material_ref,
           material_issue: clientInfo.issue,
-          client_address: clientInfo.address,
+          client_address: `${clientInfo.addressLine1}${clientInfo.addressLine2 ? ', ' + clientInfo.addressLine2 : ''}, ${postalCode} ${clientInfo.city}`,
           access_instructions: clientInfo.access_instructions,
           client_phone: clientInfo.phone,
           // Nouveaux champs
@@ -695,11 +697,31 @@ export default function BookingWizard() {
               {appointmentType === 'domicile' && (
                 <div className="space-y-4">
                   <input
-                    placeholder="Adresse d'intervention complète"
+                    placeholder="Adresse ligne 1 (ex: 12 rue des lilas)"
                     className="w-full p-4 rounded-xl border border-slate-200"
-                    value={clientInfo.address}
-                    onChange={e => setClientInfo({ ...clientInfo, address: e.target.value })}
+                    value={clientInfo.addressLine1}
+                    onChange={e => setClientInfo({ ...clientInfo, addressLine1: e.target.value })}
                   />
+                  <input
+                    placeholder="Adresse complémentaire (Bâtiment, Étage...)"
+                    className="w-full p-4 rounded-xl border border-slate-200"
+                    value={clientInfo.addressLine2}
+                    onChange={e => setClientInfo({ ...clientInfo, addressLine2: e.target.value })}
+                  />
+                  <div className="flex gap-4">
+                    <input
+                      placeholder="Code Postal"
+                      className="w-1/3 p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-not-allowed"
+                      value={postalCode}
+                      disabled
+                    />
+                    <input
+                      placeholder="Ville"
+                      className="w-2/3 p-4 rounded-xl border border-slate-200"
+                      value={clientInfo.city}
+                      onChange={e => setClientInfo({ ...clientInfo, city: e.target.value })}
+                    />
+                  </div>
                   <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100/50">
                     <label className="block text-xs font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
                       <MapPin className="w-4 h-4" /> Instructions d'accès (Optionnel)
@@ -822,7 +844,9 @@ export default function BookingWizard() {
                     {appointmentType === 'domicile' && (
                       <div className="flex flex-col">
                         <span className="text-[10px] text-slate-400 uppercase font-black">Adresse</span>
-                        <p className="text-slate-600 text-sm italic">{clientInfo.address || 'Non renseignée'}</p>
+                        <p className="text-slate-600 text-sm italic">
+                          {clientInfo.addressLine1 ? `${clientInfo.addressLine1}${clientInfo.addressLine2 ? ', ' + clientInfo.addressLine2 : ''}, ${postalCode} ${clientInfo.city}` : 'Non renseignée'}
+                        </p>
                       </div>
                     )}
                     {appointmentType === 'domicile' && clientInfo.access_instructions && (
@@ -906,7 +930,7 @@ export default function BookingWizard() {
               (step === 'postal' && postalCode.length < 5) ||
               (step === 'equipment' && (!selectedEquipmentTypeId && !customQuestion)) ||
               (step === 'slot' && (!selectedSlot || !selectedDate)) ||
-              (step === 'info' && (!clientInfo.email || !clientInfo.name))
+              (step === 'info' && (!clientInfo.email || !clientInfo.name || (appointmentType === 'domicile' && (!clientInfo.addressLine1 || !clientInfo.city))))
             }
             className="bg-primary text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
           >
