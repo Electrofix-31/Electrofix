@@ -37,7 +37,7 @@ export default function AdminAppointmentsPage() {
         warranty_types(name)
       `)
       .eq('date', date)
-      .order('start_time', { ascending: true });
+      .order('time', { ascending: true });
 
     if (error) console.error("Erreur de récupération des RDV:", error);
     else setAppointments(data || []);
