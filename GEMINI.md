@@ -1,5 +1,11 @@
 # Mandats du Projet ELECTRO'FIX
 
+> **🔔 RAPPEL POUR LA PROCHAINE SESSION :**
+> Nous avons décidé d'effectuer un changement d'architecture majeur : **La migration vers un système de rôles granulaires (RBAC)**.
+> - **Objectif principal :** Créer un vrai module SIRH pour Anne. Les employés (`is_staff`) doivent être distincts des administrateurs techniques (`superadmin`).
+> - **Ce qu'il faut faire en premier :** Créer un script SQL pour transformer la colonne `role` de la table `profiles` (actuellement 'admin' ou 'client') en une énumération plus riche (`superadmin`, `owner`, `technician`, `sales`).
+> - **Nettoyage possible :** N'hésite pas à supprimer les tables ou données inutiles de Supabase pour repartir sur des bases saines.
+
 Ce document contient les instructions prioritaires et immuables pour le développement de l'application.
 
 ## 1. Communication et Langue

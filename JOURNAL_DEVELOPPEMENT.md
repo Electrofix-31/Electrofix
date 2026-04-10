@@ -53,6 +53,35 @@ Une solution de réservation "End-to-End" professionnelle. Le client est rassur�
 
 ---
 
+## [09/04/2026] - Nuit : Décision Architecturale Majeure (Transition vers un modèle ERP & RBAC)
+
+### Problématique
+Lors de la conception du module RH (gestion de l'équipe et des absences), une faille conceptuelle est apparue : le système confondait l'accès technique à l'administration et l'appartenance à l'entreprise. 
+De plus, la vision à long terme du projet inclut la gestion d'une boutique physique (ventes, stocks) et potentiellement des livraisons. Le modèle binaire actuel (`admin` vs `client`) est insuffisant et risqué pour la sécurité des données financières d'Anne si l'équipe s'agrandit.
+
+### Analyse & Logique (Vision "Vrai SIRH" et Sécurité)
+*   **Séparation Identité / Rôle / Présence :** Le développeur (`amiraljp.fr@gmail.com`) ne doit pas apparaître dans les plannings d'intervention.
+*   **Granularité des droits (RBAC - Role-Based Access Control) :** Il est impératif d'anticiper l'arrivée de nouveaux profils métiers.
+    *   Un *technicien* ne doit voir que ses interventions et ses rapports.
+    *   Un futur *vendeur* ne verra que la caisse et le stock.
+    *   La *gérante* (Anne) et le *super-admin* ont accès aux données sensibles (Stripe, Trésorerie, Paramètres).
+*   **Autonomie "No-Code" pour le recrutement :** Anne doit pouvoir créer une fiche employé complète (Nom, Prénom, Contrat, Rôle, Absences) depuis une seule interface intuitive, sans bidouiller la base de données ou demander aux employés de se créer un compte client au préalable.
+
+### Décision / Plan d'Action (À exécuter à la prochaine session)
+1.  **Refonte SQL (Sécurité & Rôles) :**
+    *   Création d'un système de rôles énumérés (`superadmin`, `owner`, `technician`, `sales`, etc.).
+    *   Ajout d'un indicateur `is_staff` (booléen) pour différencier les employés opérationnels des simples accès techniques.
+    *   Renforcement strict des politiques de sécurité (RLS) dans Supabase pour cloisonner les futures données (Trésorerie vs Interventions).
+2.  **Refonte de l'interface "L'Équipe" (Le SIRH d'Anne) :**
+    *   Création d'un véritable formulaire "Nouveau Collaborateur" (avec définition du rôle métier).
+    *   Intégration du module d'absences et de contrats (les bases SQL ont été posées plus tôt dans la soirée).
+3.  **Nettoyage des données :** Si nécessaire, purge des données de test obsolètes dans Supabase pour repartir sur des bases saines avec ce nouveau modèle de données.
+
+### Résultat Attendu
+Une fondation robuste, prête à encaisser la croissance de l'entreprise sur les 5 prochaines années sans compromettre la sécurité financière, tout en offrant à Anne un outil de gestion du personnel digne d'un grand réseau.
+
+---
+
 ## [09/04/2026] - Intelligence Cartographique & Automatisation des Remboursements
 
 ### Problématique
